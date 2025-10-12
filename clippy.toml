@@ -1,0 +1,19 @@
+# Configuration Clippy stricte pour Bus Scraper
+
+# Seuils de complexité (valeurs strictes)
+cognitive-complexity-threshold = 15       # Défaut: 25, stricte: 10-15
+type-complexity-threshold = 250           # Défaut: 250
+too-many-arguments-threshold = 5          # Défaut: 7
+too-many-lines-threshold = 100            # Défaut: 100
+
+# Méthodes/fonctions interdites (avec raisons)
+disallowed-methods = [
+    { path = "std::env::var", reason = "Use std::env::var with proper Result handling, not panic" },
+]
+
+# Noms de variables interdits (force des noms descriptifs)
+disallowed-names = ["foo", "bar", "baz", "test", "tmp", "temp"]
+
+# Documentation
+# Décommenter pour forcer la doc sur tous les items (très strict)
+# missing-docs-in-private-items = true
