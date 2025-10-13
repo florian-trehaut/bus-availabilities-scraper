@@ -250,6 +250,15 @@ impl BusScraper {
         let html = response.text().await?;
         debug!("Fetched schedules HTML, length: {}", html.len());
 
+        #[cfg(debug_assertions)]
+        {
+            #[allow(clippy::disallowed_methods)]
+            if std::env::var("SAVE_HTML").is_ok() {
+                let _ = std::fs::write("/tmp/schedules.html", &html);
+                debug!("Saved HTML to /tmp/schedules.html");
+            }
+        }
+
         Ok(html)
     }
 

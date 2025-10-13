@@ -26,8 +26,6 @@ async fn main() -> anyhow::Result<()> {
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
     loop {
-        interval.tick().await;
-
         match scraper.check_availability_full(&config.request).await {
             Ok(schedules) => {
                 info!(
@@ -71,5 +69,7 @@ async fn main() -> anyhow::Result<()> {
                 error!("Failed to check availability: {}", e);
             }
         }
+
+        interval.tick().await;
     }
 }

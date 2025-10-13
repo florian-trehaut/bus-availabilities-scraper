@@ -68,10 +68,14 @@ impl Config {
 
         passengers.validate()?;
 
-        let time_filter = match (
-            env::var("DEPARTURE_TIME_MIN").ok(),
-            env::var("DEPARTURE_TIME_MAX").ok(),
-        ) {
+        let time_min = env::var("DEPARTURE_TIME_MIN")
+            .ok()
+            .filter(|s| !s.is_empty());
+        let time_max = env::var("DEPARTURE_TIME_MAX")
+            .ok()
+            .filter(|s| !s.is_empty());
+
+        let time_filter = match (time_min, time_max) {
             (None, None) => None,
             (min, max) => Some(TimeFilter {
                 departure_min: min,
