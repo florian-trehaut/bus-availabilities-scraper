@@ -217,7 +217,7 @@ impl BusScraper {
         ];
 
         let html = self.fetch_schedules_html(&url, &params).await?;
-        let mut schedules = html_parser::parse_schedules_html(&html)?;
+        let mut schedules = html_parser::parse_schedules_html(&html, date)?;
 
         if let Some(ref filter) = request.time_filter {
             schedules.retain(|s| filter.matches(&s.departure_time));

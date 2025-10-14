@@ -77,10 +77,8 @@ pub struct DateRange {
 
 impl DateRange {
     pub fn dates(&self) -> Result<Vec<String>> {
-        let start = NaiveDate::parse_from_str(&self.start, "%Y%m%d")
-            .map_err(|e| ScraperError::Config(format!("Invalid start date: {}", e)))?;
-        let end = NaiveDate::parse_from_str(&self.end, "%Y%m%d")
-            .map_err(|e| ScraperError::Config(format!("Invalid end date: {}", e)))?;
+        let start = Self::parse_date(&self.start)?;
+        let end = Self::parse_date(&self.end)?;
 
         if start > end {
             return Err(ScraperError::Config(
@@ -98,6 +96,17 @@ impl DateRange {
         }
 
         Ok(dates)
+    }
+
+    fn parse_date(date_str: &str) -> Result<NaiveDate> {
+        NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
+            .or_else(|_| NaiveDate::parse_from_str(date_str, "%Y%m%d"))
+            .map_err(|e| {
+                ScraperError::Config(format!(
+                    "Invalid date '{}' (expected YYYY-MM-DD or YYYYMMDD): {}",
+                    date_str, e
+                ))
+            })
     }
 }
 
@@ -195,4 +204,151 @@ pub enum SeatAvailability {
     Available { remaining_seats: Option<u32> },
     SoldOut,
     Unknown,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_date_range_iso_format() {
+        let range = DateRange {
+            start: "2025-10-29".to_string(),
+            end: "2025-11-02".to_string(),
+        };
+
+        let dates = range.dates().unwrap();
+        assert_eq!(dates.len(), 5);
+        assert_eq!(dates[0], "20251029");
+        assert_eq!(dates[4], "20251102");
+    }
+
+    #[test]
+    fn test_date_range_yyyymmdd_format() {
+        let range = DateRange {
+            start: "20251029".to_string(),
+            end: "20251102".to_string(),
+        };
+
+        let dates = range.dates().unwrap();
+        assert_eq!(dates.len(), 5);
+        assert_eq!(dates[0], "20251029");
+        assert_eq!(dates[4], "20251102");
+    }
+
+    #[test]
+    fn test_date_range_mixed_formats() {
+        let range = DateRange {
+            start: "2025-10-29".to_string(),
+            end: "20251102".to_string(),
+        };
+
+        let dates = range.dates().unwrap();
+        assert_eq!(dates.len(), 5);
+        assert_eq!(dates[0], "20251029");
+        assert_eq!(dates[4], "20251102");
+    }
+
+    #[test]
+    fn test_date_range_single_day() {
+        let range = DateRange {
+            start: "2025-10-29".to_string(),
+            end: "2025-10-29".to_string(),
+        };
+
+        let dates = range.dates().unwrap();
+        assert_eq!(dates.len(), 1);
+        assert_eq!(dates[0], "20251029");
+    }
+
+    #[test]
+    fn test_date_range_invalid_format() {
+        let range = DateRange {
+            start: "2025/10/29".to_string(),
+            end: "2025-10-30".to_string(),
+        };
+
+        assert!(range.dates().is_err());
+    }
+
+    #[test]
+    fn test_date_range_start_after_end() {
+        let range = DateRange {
+            start: "2025-11-02".to_string(),
+            end: "2025-10-29".to_string(),
+        };
+
+        let result = range.dates();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Start date must be before end date"));
+    }
+
+    #[test]
+    fn test_passenger_count_validation() {
+        let valid = PassengerCount {
+            adult_men: 1,
+            ..Default::default()
+        };
+        assert!(valid.validate().is_ok());
+
+        let too_many = PassengerCount {
+            adult_men: 10,
+            adult_women: 3,
+            ..Default::default()
+        };
+        assert!(too_many.validate().is_err());
+
+        let zero = PassengerCount {
+            adult_men: 0,
+            adult_women: 0,
+            child_men: 0,
+            child_women: 0,
+            handicap_adult_men: 0,
+            handicap_adult_women: 0,
+            handicap_child_men: 0,
+            handicap_child_women: 0,
+        };
+        assert!(zero.validate().is_err());
+    }
+
+    #[test]
+    fn test_time_filter_matching() {
+        let filter = TimeFilter {
+            departure_min: Some("08:00".to_string()),
+            departure_max: Some("10:00".to_string()),
+        };
+
+        assert!(filter.matches("09:30"));
+        assert!(filter.matches("08:00"));
+        assert!(filter.matches("10:00"));
+        assert!(!filter.matches("07:59"));
+        assert!(!filter.matches("10:01"));
+    }
+
+    #[test]
+    fn test_time_filter_no_min() {
+        let filter = TimeFilter {
+            departure_min: None,
+            departure_max: Some("10:00".to_string()),
+        };
+
+        assert!(filter.matches("00:00"));
+        assert!(filter.matches("09:59"));
+        assert!(!filter.matches("10:01"));
+    }
+
+    #[test]
+    fn test_time_filter_no_max() {
+        let filter = TimeFilter {
+            departure_min: Some("08:00".to_string()),
+            departure_max: None,
+        };
+
+        assert!(filter.matches("08:00"));
+        assert!(filter.matches("23:59"));
+        assert!(!filter.matches("07:59"));
+    }
 }

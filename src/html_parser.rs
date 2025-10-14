@@ -4,14 +4,14 @@ use regex::Regex;
 use scraper::{ElementRef, Html, Selector};
 use tracing::debug;
 
-pub fn parse_schedules_html(html: &str) -> Result<Vec<BusSchedule>> {
+pub fn parse_schedules_html(html: &str, boarding_date: &str) -> Result<Vec<BusSchedule>> {
     let document = Html::parse_document(html);
     let bus_selector = Selector::parse("section.busSvclistItem")
         .map_err(|e| ScraperError::Parse(format!("Invalid selector: {:?}", e)))?;
 
     let mut schedules = Vec::new();
     for (index, bus_element) in document.select(&bus_selector).enumerate() {
-        match parse_single_bus(bus_element, index + 1, html) {
+        match parse_single_bus(bus_element, index + 1, html, boarding_date) {
             Ok(schedule) => {
                 schedules.push(schedule);
             }
@@ -28,6 +28,7 @@ fn parse_single_bus(
     element: ElementRef,
     bus_index: usize,
     _full_html: &str,
+    boarding_date: &str,
 ) -> Result<BusSchedule> {
     let departure_time = extract_time(element, "dep")?;
     let arrival_time = extract_time(element, "arr")?;
@@ -37,7 +38,7 @@ fn parse_single_bus(
         bus_number: format!("Bus_{}", bus_index),
         route_name: String::new(),
         departure_station: String::new(),
-        departure_date: String::new(),
+        departure_date: boarding_date.to_string(),
         departure_time,
         arrival_station: String::new(),
         arrival_date: String::new(),

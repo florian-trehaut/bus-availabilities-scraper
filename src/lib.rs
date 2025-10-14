@@ -1,0 +1,11 @@
+pub mod config;
+pub mod db;
+pub mod entities;
+pub mod error;
+pub mod html_parser;
+pub mod notifier;
+pub mod repositories;
+pub mod scraper;
+pub mod seed;
+pub mod seed_routes;
+pub mod types;
