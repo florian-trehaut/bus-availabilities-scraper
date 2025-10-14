@@ -1,48 +1,45 @@
 use crate::error::{Result, ScraperError};
 use crate::types::{DateRange, PassengerCount, ScrapeRequest, TimeFilter};
 use chrono::Local;
-use std::env;
 
 #[derive(Debug, Clone)]
 pub struct Config {
-    pub base_url: String,
     pub scrape_interval_secs: u64,
     pub request: ScrapeRequest,
+    pub discord_webhook_url: Option<String>,
+    pub notify_on_change_only: bool,
 }
 
 impl Config {
-    #[allow(clippy::disallowed_methods)] // env::var is used with proper error handling
+    #[allow(clippy::disallowed_methods)] // dotenvy::var uses env::var internally
     pub fn from_env() -> Result<Self> {
         dotenvy::dotenv().ok();
 
-        let base_url =
-            env::var("BASE_URL").unwrap_or_else(|_| "https://www.highwaybus.com/gp".to_string());
-
-        let scrape_interval_secs = env::var("SCRAPE_INTERVAL_SECS")
+        let scrape_interval_secs = dotenvy::var("SCRAPE_INTERVAL_SECS")
             .unwrap_or_else(|_| "300".to_string())
             .parse::<u64>()
             .map_err(|_| ScraperError::Config("Invalid SCRAPE_INTERVAL_SECS".to_string()))?;
 
-        let area_id = env::var("AREA_ID")
+        let area_id = dotenvy::var("AREA_ID")
             .unwrap_or_else(|_| "1".to_string())
             .parse::<u32>()
             .map_err(|_| ScraperError::Config("Invalid AREA_ID".to_string()))?;
 
-        let route_id = env::var("ROUTE_ID")
+        let route_id = dotenvy::var("ROUTE_ID")
             .map_err(|_| ScraperError::Config("ROUTE_ID is required".to_string()))?
             .parse::<u32>()
             .map_err(|_| ScraperError::Config("Invalid ROUTE_ID".to_string()))?;
 
-        let departure_station = env::var("DEPARTURE_STATION")
+        let departure_station = dotenvy::var("DEPARTURE_STATION")
             .map_err(|_| ScraperError::Config("DEPARTURE_STATION is required".to_string()))?;
 
-        let arrival_station = env::var("ARRIVAL_STATION")
+        let arrival_station = dotenvy::var("ARRIVAL_STATION")
             .map_err(|_| ScraperError::Config("ARRIVAL_STATION is required".to_string()))?;
 
         let date_start =
-            env::var("DATE_START").unwrap_or_else(|_| Local::now().format("%Y%m%d").to_string());
+            dotenvy::var("DATE_START").unwrap_or_else(|_| Local::now().format("%Y%m%d").to_string());
 
-        let date_end = env::var("DATE_END").unwrap_or_else(|_| {
+        let date_end = dotenvy::var("DATE_END").unwrap_or_else(|_| {
             Local::now()
                 .checked_add_signed(chrono::Duration::days(7))
                 .unwrap()
@@ -68,10 +65,10 @@ impl Config {
 
         passengers.validate()?;
 
-        let time_min = env::var("DEPARTURE_TIME_MIN")
+        let time_min = dotenvy::var("DEPARTURE_TIME_MIN")
             .ok()
             .filter(|s| !s.is_empty());
-        let time_max = env::var("DEPARTURE_TIME_MAX")
+        let time_max = dotenvy::var("DEPARTURE_TIME_MAX")
             .ok()
             .filter(|s| !s.is_empty());
 
@@ -83,9 +80,19 @@ impl Config {
             }),
         };
 
+        let discord_webhook_url = dotenvy::var("DISCORD_WEBHOOK_URL")
+            .ok()
+            .filter(|s| !s.is_empty());
+
+        let notify_on_change_only = dotenvy::var("NOTIFY_ON_CHANGE_ONLY")
+            .unwrap_or_else(|_| "true".to_string())
+            .parse::<bool>()
+            .unwrap_or(true);
+
         Ok(Config {
-            base_url,
             scrape_interval_secs,
+            discord_webhook_url,
+            notify_on_change_only,
             request: ScrapeRequest {
                 area_id,
                 route_id,
@@ -99,9 +106,8 @@ impl Config {
     }
 }
 
-#[allow(clippy::disallowed_methods)] // env::var is used with proper error handling
 fn parse_env_u8(key: &str, default: u8) -> Result<u8> {
-    env::var(key)
+    dotenvy::var(key)
         .unwrap_or_else(|_| default.to_string())
         .parse::<u8>()
         .map_err(|_| ScraperError::Config(format!("Invalid {}", key)))
