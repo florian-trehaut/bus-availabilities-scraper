@@ -3,6 +3,10 @@ name = "bus-availabilities-scaper"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "bus_availabilities_scaper"
+path = "src/lib.rs"
+
 [dependencies]
 tokio = { version = "1.42", features = ["full"] }
 reqwest = { version = "0.12", features = ["cookies", "json"] }
@@ -16,3 +20,7 @@ anyhow = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 scraper = "0.20"
 regex = "1.10"
+sea-orm = { version = "1.1", features = ["sqlx-sqlite", "runtime-tokio-rustls", "macros"] }
+sea-orm-migration = { version = "1.1", features = ["sqlx-sqlite", "runtime-tokio-rustls"] }
+uuid = { version = "1.11", features = ["v4", "serde"] }
+migration = { path = "migration" }
