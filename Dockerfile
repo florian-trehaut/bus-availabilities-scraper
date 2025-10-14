@@ -1,46 +1,53 @@
 # Stage 1: Planner - Generate recipe.json
-FROM rust:1.85-slim AS planner
+FROM lukemathwalker/cargo-chef:latest-rust-1.85-alpine AS planner
 WORKDIR /app
-RUN cargo install cargo-chef
-COPY . .
+COPY Cargo.toml Cargo.lock ./
+COPY migration ./migration
+COPY src ./src
 RUN cargo chef prepare --recipe-path recipe.json
 
 # Stage 2: Builder - Cache dependencies and build
-FROM rust:1.85-slim AS builder
+FROM lukemathwalker/cargo-chef:latest-rust-1.85-alpine AS builder
 WORKDIR /app
 
-# Install cargo-chef
-RUN cargo install cargo-chef
+# Install build dependencies
+RUN apk add --no-cache \
+    musl-dev \
+    openssl-dev \
+    openssl-libs-static \
+    pkgconfig
 
-# Install required system dependencies
-RUN apt-get update && apt-get install -y \
-    pkg-config \
-    libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
+# Configure parallel builds
+ENV CARGO_BUILD_JOBS=4
 
-# Copy recipe and build dependencies (cached layer)
+# Copy recipe and build dependencies (cached layer with BuildKit cache mounts)
 COPY --from=planner /app/recipe.json recipe.json
-RUN cargo chef cook --release --recipe-path recipe.json
+COPY --from=planner /app/migration ./migration
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    cargo chef cook --release --recipe-path recipe.json
 
 # Copy source code and build application
-COPY . .
-RUN cargo build --release
+COPY Cargo.toml Cargo.lock ./
+COPY src ./src
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    cargo build --release
 
-# Stage 3: Runtime - Minimal image with only the binary
-FROM debian:bookworm-slim AS runtime
+# Strip debug symbols
+RUN strip target/release/bus-availabilities-scaper
+
+# Stage 3: Runtime - Minimal Alpine image
+FROM alpine:3.20 AS runtime
 WORKDIR /app
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
-    ca-certificates \
-    libssl3 \
-    && rm -rf /var/lib/apt/lists/*
+# Install only CA certificates for HTTPS
+RUN apk add --no-cache ca-certificates
 
 # Copy binary from builder
 COPY --from=builder /app/target/release/bus-availabilities-scaper /usr/local/bin/
 
-# Create non-root user
-RUN useradd -m -u 1000 scraper && \
+# Create data directory and non-root user
+RUN mkdir -p /app/data && \
+    adduser -D -u 1000 scraper && \
     chown -R scraper:scraper /app
 
 USER scraper

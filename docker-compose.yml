@@ -1,0 +1,13 @@
+services:
+  bus-scraper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bus-scraper
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      RUST_LOG: info
+    volumes:
+      - ./data:/app/data

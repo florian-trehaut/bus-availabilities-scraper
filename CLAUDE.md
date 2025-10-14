@@ -25,11 +25,19 @@ L'API suit la structure des dropdowns en cascade du site web :
 
 ```
 src/
-├── main.rs         # Entry point - scheduler tokio + logging
-├── scraper.rs      # Client HTTP + API calls + XML parsing
-├── types.rs        # Route, Station, AvailableDate, ScrapeRequest
-├── config.rs       # Config from .env
-└── error.rs        # ScraperError + Result alias
+├── main.rs           # Entry point - multi-user scheduler tokio + logging
+├── scraper.rs        # Client HTTP + API calls + XML parsing
+├── html_parser.rs    # HTML parsing for schedules + availability
+├── types.rs          # Route, Station, BusSchedule, ScrapeRequest
+├── config.rs         # Legacy .env config (for SEED_FROM_ENV)
+├── error.rs          # ScraperError + Result alias
+├── db.rs             # Database connection init
+├── entities/         # SeaORM entities (users, routes, stations, etc.)
+├── repositories.rs   # Database queries (user_routes, route_state)
+├── notifier.rs       # Discord webhook notifications
+├── seed.rs           # Seed user from .env
+├── seed_routes.rs    # Seed routes catalog from API
+└── migration/        # Database migrations (SeaORM)
 ```
 
 **src/scraper.rs** - Core
@@ -58,20 +66,48 @@ src/
 - `SeatAvailability` : enum (Available, SoldOut, Unknown)
 - `AvailabilityResult` : legacy output avec dates disponibles
 
-**src/config.rs** - Environment config
+**src/config.rs** - Legacy environment config
 - Load `.env` via dotenvy
 - Parse et valide tous les params
 - Return `Config` avec `ScrapeRequest`
+- **Usage** : Uniquement pour `SEED_FROM_ENV=true` (migration legacy → DB)
+
+**src/db.rs** + **src/entities/** - Database layer
+- SeaORM avec SQLite
+- Entities : `users`, `user_routes`, `user_passengers`, `route_states`, `routes`, `stations`
+- Init database + connection pool
+
+**src/repositories.rs** - Database queries
+- `get_all_active_user_routes()` : fetch tous les users actifs avec leurs routes + passengers
+- `get_route_state()` / `update_route_state()` : tracking hash pour notify_on_change_only
+- `get_station_name()` : lookup nom station depuis catalog
+
+**src/notifier.rs** - Discord webhooks
+- `send_startup_notification()` : notif au démarrage (user_count, route_count)
+- `send_availability_alert()` : notif disponibilité avec embeds formatés
+- Non-bloquant : log errors mais ne fail pas
+
+**src/seed.rs** - Seed user from .env
+- Crée user + user_route + passengers depuis `.env`
+- Validation : vérifie que route_id et stations existent dans catalog
+
+**src/seed_routes.rs** - Seed routes catalog from API
+- Scrape toutes les routes de area_id via `fetch_routes()`
+- Pour chaque route : scrape departure + arrival stations
+- Insert dans tables `routes` + `stations` avec dedup
+- Run once avec `SEED_ROUTES_CATALOG=true`
 
 **src/error.rs** - Error handling
 - `ScraperError` : Http, Parse, Config, ServiceUnavailable, InvalidResponse
 - Auto-conversion depuis reqwest::Error (check 503 status)
 - Type alias `Result<T>`
 
-**src/main.rs** - Scheduler
-- Tokio runtime avec `tokio::time::interval`
-- `MissedTickBehavior::Skip` (pas de catch-up si retard)
-- Logging structuré (tracing) + JSON output
+**src/main.rs** - Multi-user scheduler
+- Load tous les users actifs depuis DB via `get_all_active_user_routes()`
+- Spawn 1 tokio task par user_route avec intervalle personnalisé
+- Chaque task : `tokio::time::interval` + `MissedTickBehavior::Skip`
+- Hash-based state tracking pour `notify_on_change_only`
+- Graceful shutdown sur SIGTERM/SIGINT
 
 ### Parsing XML Non-Standard
 
@@ -99,8 +135,89 @@ Format API inhabituel - multiples éléments avec même tag au même niveau :
 - **Rate limiting** : Implicite via scheduler interval + delays additionnels dans retry
 - **Headers** : User-Agent + Referer sur CHAQUE requête
 
+## Architecture Base de Données
+
+### Tables (SeaORM + SQLite)
+
+**`users`** - Configuration globale par utilisateur
+- `id` (UUID, PK)
+- `email` (TEXT)
+- `enabled` (BOOLEAN)
+- `notify_on_change_only` (BOOLEAN)
+- `scrape_interval_secs` (INT)
+- `discord_webhook_url` (TEXT nullable)
+- `created_at` (TIMESTAMP)
+
+**`user_routes`** - Routes suivies par user (1:N avec users)
+- `id` (UUID, PK)
+- `user_id` (UUID, FK → users)
+- `area_id`, `route_id` (INT)
+- `departure_station`, `arrival_station` (TEXT)
+- `date_start`, `date_end` (TEXT, format YYYY-MM-DD)
+- `departure_time_min`, `departure_time_max` (TEXT nullable, HH:MM)
+- `created_at` (TIMESTAMP)
+
+**`user_passengers`** - Config passagers par route (1:1 avec user_routes)
+- `user_route_id` (UUID, PK + FK)
+- 8 colonnes passagers (INT) : `adult_men`, `adult_women`, etc.
+
+**`route_states`** - State tracking pour notify_on_change_only
+- `user_route_id` (UUID, PK + FK)
+- `last_seen_hash` (TEXT) : hash des schedules disponibles
+- `last_check` (TIMESTAMP)
+- `total_checks`, `total_alerts` (INT)
+
+**`routes`** - Catalogue Highway Bus (référence)
+- `route_id` (TEXT, PK)
+- `area_id` (INT)
+- `name` (TEXT)
+- `switch_changeable_flg` (TEXT nullable)
+- `created_at` (TIMESTAMP)
+- Index sur `area_id`
+
+**`stations`** - Catalogue stations (référence)
+- `station_id` (TEXT, PK)
+- `name` (TEXT)
+- `area_id` (INT)
+- `route_id` (INT nullable) : première route associée
+- `created_at` (TIMESTAMP)
+- Index composite sur `(area_id, route_id)`
+
+### Workflow de Seeding
+
+**1. First run - Peupler catalogue (run once)**
+```bash
+SEED_ROUTES_CATALOG=true cargo run
+```
+Scrape toutes routes + stations de area_id=1 via API → tables `routes` + `stations`
+
+**2. Seed user depuis .env (optionnel)**
+```bash
+SEED_FROM_ENV=true cargo run
+```
+Crée user + user_route + passengers depuis `.env` → validation contre catalog
+
+**3. Run normal**
+```bash
+cargo run
+```
+Load users actifs depuis DB → spawn 1 task/route avec intervalle personnalisé
+
 ## Configuration (.env)
 
+### Variables de seeding
+```bash
+# Database
+DATABASE_URL=sqlite://data/bus_scraper.db?mode=rwc
+
+# Seed routes catalog (run once)
+SEED_ROUTES_CATALOG=false
+
+# Seed user from .env (legacy migration)
+SEED_FROM_ENV=false
+```
+
+### Variables pour SEED_FROM_ENV (legacy)
 ```bash
 # Geographic area (1 = Tokyo/Shinjuku)
 AREA_ID=1
@@ -114,9 +231,9 @@ ROUTE_ID=155
 DEPARTURE_STATION=001  # Busta Shinjuku
 ARRIVAL_STATION=498    # Kamikochi Bus Terminal
 
-# Date range (YYYYMMDD format, defaults to today → today+7)
-DATE_START=20251012
-DATE_END=20251019
+# Date range (ISO 8601 or YYYYMMDD)
+DATE_START=2025-10-12
+DATE_END=2025-10-19
 
 # Time filter (optional, HH:MM format)
 DEPARTURE_TIME_MIN=06:00
