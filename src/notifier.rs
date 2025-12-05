@@ -1,7 +1,8 @@
-use crate::error::Result;
+use crate::error::{Result, ScraperError};
 use crate::types::{BusSchedule, SeatAvailability};
 use reqwest::Client;
 use serde_json::json;
+use std::time::Duration;
 use tracing::{error, info};
 
 #[derive(Debug, Clone)]
@@ -18,10 +19,12 @@ pub struct DiscordNotifier {
 }
 
 impl DiscordNotifier {
-    pub fn new() -> Self {
-        Self {
-            client: Client::new(),
-        }
+    pub fn new() -> Result<Self> {
+        let client = Client::builder()
+            .timeout(Duration::from_secs(10))
+            .build()
+            .map_err(|e| ScraperError::Config(format!("Failed to build HTTP client: {}", e)))?;
+        Ok(Self { client })
     }
 
     pub async fn send_startup_notification(
@@ -52,7 +55,10 @@ impl DiscordNotifier {
                     info!("Startup notification sent successfully");
                     Ok(())
                 } else {
-                    error!("Startup notification failed with status: {}", response.status());
+                    error!(
+                        "Startup notification failed with status: {}",
+                        response.status()
+                    );
                     Ok(())
                 }
             }
@@ -98,7 +104,11 @@ impl DiscordNotifier {
         }
     }
 
-    fn build_embed(&self, schedules: &[BusSchedule], context: &NotificationContext) -> serde_json::Value {
+    fn build_embed(
+        &self,
+        schedules: &[BusSchedule],
+        context: &NotificationContext,
+    ) -> serde_json::Value {
         let mut fields = Vec::new();
         let mut count_with_plans = 0;
 
@@ -112,13 +122,10 @@ impl DiscordNotifier {
             let formatted_date = format_date(&schedule.departure_date);
 
             for plan in &schedule.available_plans {
-                let seats_info = match &plan.availability {
-                    SeatAvailability::Available { remaining_seats } => match remaining_seats {
-                        Some(n) => format!("{} sièges", n),
-                        None => "Places dispo".to_string(),
-                    },
-                    SeatAvailability::SoldOut => "Complet".to_string(),
-                    SeatAvailability::Unknown => "Inconnu".to_string(),
+                let SeatAvailability::Available { remaining_seats } = &plan.availability;
+                let seats_info = match remaining_seats {
+                    Some(n) => format!("{n} sièges"),
+                    None => "Places dispo".to_string(),
                 };
 
                 let bus_info = format!(
@@ -170,7 +177,7 @@ impl DiscordNotifier {
 }
 
 fn format_date(date_yyyymmdd: &str) -> String {
-    if date_yyyymmdd.len() == 8 {
+    if date_yyyymmdd.len() == 8 && date_yyyymmdd.is_ascii() {
         format!(
             "{}/{}/{}",
             &date_yyyymmdd[6..8],
@@ -182,20 +189,15 @@ fn format_date(date_yyyymmdd: &str) -> String {
     }
 }
 
-impl Default for DiscordNotifier {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
     use crate::types::PricingPlan;
 
     #[test]
     fn test_build_embed() {
-        let notifier = DiscordNotifier::new();
+        let notifier = DiscordNotifier::new().expect("Failed to create notifier");
 
         let schedules = vec![BusSchedule {
             bus_number: "Bus_1".to_string(),
@@ -237,7 +239,7 @@ mod tests {
 
     #[test]
     fn test_build_embed_empty() {
-        let notifier = DiscordNotifier::new();
+        let notifier = DiscordNotifier::new().expect("Failed to create notifier");
         let schedules = vec![];
 
         let context = NotificationContext {

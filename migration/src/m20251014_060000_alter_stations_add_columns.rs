@@ -125,10 +125,11 @@ impl MigrationTrait for Migration {
 }
 
 #[derive(DeriveIden)]
-#[allow(dead_code)]
 enum Stations {
     Table,
+    #[allow(dead_code)]
     StationId,
+    #[allow(dead_code)]
     Name,
     AreaId,
     RouteId,

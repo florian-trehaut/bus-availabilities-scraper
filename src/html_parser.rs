@@ -1,8 +1,23 @@
 use crate::error::{Result, ScraperError};
 use crate::types::{BusSchedule, PricingPlan, SeatAvailability};
+use once_cell::sync::Lazy;
 use regex::Regex;
 use scraper::{ElementRef, Html, Selector};
 use tracing::debug;
+
+// SAFETY: These regex patterns are compile-time constants and have been validated.
+// Panicking here is acceptable as it indicates a programming error in the pattern.
+#[allow(clippy::expect_used)]
+static TIME_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(\d{1,2}:\d{2})").expect("Invalid time regex"));
+
+#[allow(clippy::expect_used)]
+static PRICE_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(\d+,?\d*)円").expect("Invalid price regex"));
+
+#[allow(clippy::expect_used)]
+static SEATS_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"残り(\d+)席").expect("Invalid seats regex"));
 
 pub fn parse_schedules_html(html: &str, boarding_date: &str) -> Result<Vec<BusSchedule>> {
     let document = Html::parse_document(html);
@@ -63,10 +78,8 @@ pub fn extract_time(element: ElementRef, dep_or_arr: &str) -> Result<String> {
 }
 
 fn extract_time_from_text(text: &str) -> Result<String> {
-    let re = Regex::new(r"(\d{1,2}:\d{2})")
-        .map_err(|e| ScraperError::Parse(format!("Regex error: {}", e)))?;
-
-    re.captures(text)
+    TIME_REGEX
+        .captures(text)
         .and_then(|caps| caps.get(1))
         .map(|m| m.as_str().to_string())
         .ok_or_else(|| ScraperError::Parse(format!("Time not found in text: {}", text)))
@@ -158,19 +171,16 @@ fn extract_price_from_form(form: ElementRef) -> Result<u32> {
     let price_selector = Selector::parse("p.price")
         .map_err(|e| ScraperError::Parse(format!("Invalid selector: {:?}", e)))?;
 
-    let re = Regex::new(r"(\d+,?\d*)円")
-        .map_err(|e| ScraperError::Parse(format!("Regex error: {}", e)))?;
-
     let mut current = form.parent();
     while let Some(parent) = current {
         if let Some(parent_elem) = ElementRef::wrap(parent) {
             if let Some(price_elem) = parent_elem.select(&price_selector).next() {
                 let price_text = price_elem.text().collect::<String>();
 
-                if let Some(price) = re
+                if let Some(price) = PRICE_REGEX
                     .captures(&price_text)
                     .and_then(|caps| caps.get(1))
-                    .map(|m| m.as_str().replace(",", ""))
+                    .map(|m| m.as_str().replace(',', ""))
                     .and_then(|s| s.parse().ok())
                 {
                     return Ok(price);
@@ -184,13 +194,14 @@ fn extract_price_from_form(form: ElementRef) -> Result<u32> {
 }
 
 pub fn parse_remaining_seats(button_text: &str) -> Option<u32> {
-    let re = Regex::new(r"残り(\d+)席").ok()?;
-    re.captures(button_text)
+    SEATS_REGEX
+        .captures(button_text)
         .and_then(|caps| caps.get(1))
         .and_then(|m| m.as_str().parse().ok())
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 

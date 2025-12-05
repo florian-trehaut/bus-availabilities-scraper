@@ -11,7 +11,6 @@ pub struct Config {
 }
 
 impl Config {
-    #[allow(clippy::disallowed_methods)] // dotenvy::var uses env::var internally
     pub fn from_env() -> Result<Self> {
         dotenvy::dotenv().ok();
 
@@ -36,15 +35,14 @@ impl Config {
         let arrival_station = dotenvy::var("ARRIVAL_STATION")
             .map_err(|_| ScraperError::Config("ARRIVAL_STATION is required".to_string()))?;
 
-        let date_start =
-            dotenvy::var("DATE_START").unwrap_or_else(|_| Local::now().format("%Y%m%d").to_string());
+        let date_start = dotenvy::var("DATE_START")
+            .unwrap_or_else(|_| Local::now().format("%Y%m%d").to_string());
 
         let date_end = dotenvy::var("DATE_END").unwrap_or_else(|_| {
             Local::now()
                 .checked_add_signed(chrono::Duration::days(7))
-                .unwrap()
-                .format("%Y%m%d")
-                .to_string()
+                .map(|d| d.format("%Y%m%d").to_string())
+                .unwrap_or_else(|| Local::now().format("%Y%m%d").to_string())
         });
 
         let date_range = DateRange {

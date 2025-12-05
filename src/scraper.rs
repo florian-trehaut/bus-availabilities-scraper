@@ -1,17 +1,13 @@
 use crate::error::{Result, ScraperError};
 use crate::html_parser;
-use crate::types::{
-    AvailabilityResult, AvailableDate, BusSchedule, DateSlot, Route, ScrapeRequest, Station,
-};
+use crate::types::{BusSchedule, Route, ScrapeRequest, Station};
 use quick_xml::events::Event;
 use quick_xml::Reader;
 use reqwest::Client;
 use std::time::Duration;
 use tracing::{debug, warn};
 
-#[allow(dead_code)]
 const MAX_RETRIES: u32 = 3;
-#[allow(dead_code)]
 const RETRY_DELAY_MS: u64 = 1000;
 const USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36";
 
@@ -29,65 +25,6 @@ impl BusScraper {
             .map_err(ScraperError::Http)?;
 
         Ok(Self { client, base_url })
-    }
-
-    #[allow(dead_code)]
-    pub async fn check_availability(&self, request: &ScrapeRequest) -> Result<AvailabilityResult> {
-        let routes = self.fetch_routes(request.area_id).await?;
-        let route = routes
-            .iter()
-            .find(|r| r.id == request.route_id.to_string())
-            .ok_or_else(|| ScraperError::InvalidResponse("Route not found".to_string()))?;
-
-        let departure_stations = self.fetch_departure_stations(&route.id).await?;
-        let departure = departure_stations
-            .iter()
-            .find(|s| s.id == request.departure_station)
-            .ok_or_else(|| {
-                ScraperError::InvalidResponse("Departure station not found".to_string())
-            })?;
-
-        let arrival_stations = self
-            .fetch_arrival_stations(&route.id, &departure.id)
-            .await?;
-        let arrival = arrival_stations
-            .iter()
-            .find(|s| s.id == request.arrival_station)
-            .ok_or_else(|| {
-                ScraperError::InvalidResponse("Arrival station not found".to_string())
-            })?;
-
-        let available_dates = self
-            .fetch_available_dates(&route.id, &departure.id, &arrival.id)
-            .await?;
-
-        debug!(
-            "Found {} available dates for route {} ({} -> {})",
-            available_dates.len(),
-            route.name,
-            departure.name,
-            arrival.name
-        );
-
-        let date_slots: Vec<DateSlot> = available_dates
-            .into_iter()
-            .map(|d| DateSlot {
-                id: d.id,
-                name: d.name,
-            })
-            .collect();
-
-        Ok(AvailabilityResult {
-            timestamp: chrono::Utc::now().to_rfc3339(),
-            route_id: route.id.clone(),
-            route_name: route.name.clone(),
-            departure_id: departure.id.clone(),
-            departure_name: departure.name.clone(),
-            arrival_id: arrival.id.clone(),
-            arrival_name: arrival.name.clone(),
-            date: "N/A".to_string(),
-            available_dates: date_slots,
-        })
     }
 
     pub async fn check_availability_full(
@@ -114,7 +51,6 @@ impl BusScraper {
         Ok(all_schedules)
     }
 
-    #[allow(dead_code)]
     pub async fn fetch_routes(&self, area_id: u32) -> Result<Vec<Route>> {
         let url = format!("{}/ajaxPulldown", self.base_url);
         let xml = self
@@ -124,7 +60,6 @@ impl BusScraper {
         parse_routes(&xml)
     }
 
-    #[allow(dead_code)]
     pub async fn fetch_departure_stations(&self, route_id: &str) -> Result<Vec<Station>> {
         let url = format!("{}/ajaxPulldown", self.base_url);
         let xml = self
@@ -134,7 +69,6 @@ impl BusScraper {
         parse_stations(&xml)
     }
 
-    #[allow(dead_code)]
     pub async fn fetch_arrival_stations(
         &self,
         route_id: &str,
@@ -153,29 +87,6 @@ impl BusScraper {
             .await?;
 
         parse_stations(&xml)
-    }
-
-    #[allow(dead_code)]
-    pub async fn fetch_available_dates(
-        &self,
-        route_id: &str,
-        departure_station: &str,
-        arrival_station: &str,
-    ) -> Result<Vec<AvailableDate>> {
-        let url = format!("{}/ajaxPulldown", self.base_url);
-        let xml = self
-            .fetch_with_retry(
-                &url,
-                &[
-                    ("mode", "date"),
-                    ("id", route_id),
-                    ("onStation", departure_station),
-                    ("offStation", arrival_station),
-                ],
-            )
-            .await?;
-
-        parse_dates(&xml)
     }
 
     pub async fn fetch_schedules(
@@ -250,19 +161,9 @@ impl BusScraper {
         let html = response.text().await?;
         debug!("Fetched schedules HTML, length: {}", html.len());
 
-        #[cfg(debug_assertions)]
-        {
-            #[allow(clippy::disallowed_methods)]
-            if std::env::var("SAVE_HTML").is_ok() {
-                let _ = std::fs::write("/tmp/schedules.html", &html);
-                debug!("Saved HTML to /tmp/schedules.html");
-            }
-        }
-
         Ok(html)
     }
 
-    #[allow(dead_code)]
     async fn fetch_with_retry(&self, url: &str, params: &[(&str, &str)]) -> Result<String> {
         let mut attempts = 0;
 
@@ -286,7 +187,6 @@ impl BusScraper {
         }
     }
 
-    #[allow(dead_code)]
     async fn fetch_data(&self, url: &str, params: &[(&str, &str)]) -> Result<String> {
         let response = self
             .client
@@ -312,7 +212,6 @@ impl BusScraper {
     }
 }
 
-#[allow(dead_code)]
 fn parse_routes(xml: &str) -> Result<Vec<Route>> {
     let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(true);
@@ -362,7 +261,6 @@ fn parse_routes(xml: &str) -> Result<Vec<Route>> {
     Ok(routes)
 }
 
-#[allow(dead_code)]
 fn parse_stations(xml: &str) -> Result<Vec<Station>> {
     let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(true);
@@ -400,45 +298,6 @@ fn parse_stations(xml: &str) -> Result<Vec<Station>> {
     Ok(stations)
 }
 
-#[allow(dead_code)]
-fn parse_dates(xml: &str) -> Result<Vec<AvailableDate>> {
-    let mut reader = Reader::from_str(xml);
-    reader.config_mut().trim_text(true);
-
-    let mut dates = Vec::new();
-    let mut current_id = None;
-    let mut current_name = None;
-    let mut buf = Vec::new();
-
-    loop {
-        match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(e)) => match e.name().as_ref() {
-                b"id" => {
-                    if let (Some(id), Some(name)) = (current_id.take(), current_name.take()) {
-                        dates.push(AvailableDate { id, name });
-                    }
-                    current_id = Some(read_text(&mut reader)?);
-                }
-                b"name" => {
-                    current_name = Some(read_text(&mut reader)?);
-                }
-                _ => {}
-            },
-            Ok(Event::Eof) => break,
-            Err(e) => return Err(ScraperError::Parse(format!("XML error: {}", e))),
-            _ => {}
-        }
-        buf.clear();
-    }
-
-    if let (Some(id), Some(name)) = (current_id, current_name) {
-        dates.push(AvailableDate { id, name });
-    }
-
-    Ok(dates)
-}
-
-#[allow(dead_code)]
 fn read_text(reader: &mut Reader<&[u8]>) -> Result<String> {
     let mut buf = Vec::new();
     match reader.read_event_into(&mut buf) {
@@ -447,5 +306,141 @@ fn read_text(reader: &mut Reader<&[u8]>) -> Result<String> {
             .map(|s| s.to_string())
             .map_err(|e| ScraperError::Parse(format!("Text unescape error: {}", e))),
         _ => Ok(String::new()),
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use super::*;
+    use wiremock::matchers::{body_string_contains, method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    #[tokio::test]
+    async fn test_fetch_routes_success() {
+        let mock_server = MockServer::start().await;
+
+        let xml_response = r#"
+            <id>110</id>
+            <name>Shinjuku - Fuji Five Lakes</name>
+            <switchChangeableFlg>1</switchChangeableFlg>
+            <id>155</id>
+            <name>Shinjuku - Kamikochi</name>
+        "#;
+
+        Mock::given(method("POST"))
+            .and(path("/ajaxPulldown"))
+            .and(body_string_contains("mode=line"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(xml_response))
+            .mount(&mock_server)
+            .await;
+
+        let scraper = BusScraper::new(mock_server.uri()).expect("Failed to create scraper");
+        let routes = scraper
+            .fetch_routes(1)
+            .await
+            .expect("Failed to fetch routes");
+
+        assert_eq!(routes.len(), 2);
+        assert_eq!(routes[0].id, "110");
+        assert_eq!(routes[0].name, "Shinjuku - Fuji Five Lakes");
+        assert_eq!(routes[1].id, "155");
+        assert_eq!(routes[1].name, "Shinjuku - Kamikochi");
+    }
+
+    #[tokio::test]
+    async fn test_fetch_departure_stations() {
+        let mock_server = MockServer::start().await;
+
+        let xml_response = r#"
+            <id>001</id>
+            <name>Busta Shinjuku</name>
+            <id>002</id>
+            <name>Shibuya Mark City</name>
+        "#;
+
+        Mock::given(method("POST"))
+            .and(path("/ajaxPulldown"))
+            .and(body_string_contains("mode=station_geton"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(xml_response))
+            .mount(&mock_server)
+            .await;
+
+        let scraper = BusScraper::new(mock_server.uri()).expect("Failed to create scraper");
+        let stations = scraper
+            .fetch_departure_stations("110")
+            .await
+            .expect("Failed to fetch stations");
+
+        assert_eq!(stations.len(), 2);
+        assert_eq!(stations[0].id, "001");
+        assert_eq!(stations[0].name, "Busta Shinjuku");
+    }
+
+    #[tokio::test]
+    async fn test_fetch_routes_http_error() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .respond_with(ResponseTemplate::new(500))
+            .mount(&mock_server)
+            .await;
+
+        let scraper = BusScraper::new(mock_server.uri()).expect("Failed to create scraper");
+        let result = scraper.fetch_routes(1).await;
+
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_fetch_routes_empty_response() {
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(""))
+            .mount(&mock_server)
+            .await;
+
+        let scraper = BusScraper::new(mock_server.uri()).expect("Failed to create scraper");
+        let routes = scraper
+            .fetch_routes(1)
+            .await
+            .expect("Failed to fetch routes");
+
+        assert!(routes.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_parse_routes_xml() {
+        let xml = r#"
+            <id>110</id>
+            <name>Route A</name>
+            <switchChangeableFlg>1</switchChangeableFlg>
+            <id>120</id>
+            <name>Route B</name>
+        "#;
+
+        let routes = parse_routes(xml).expect("Failed to parse routes");
+        assert_eq!(routes.len(), 2);
+        assert_eq!(routes[0].id, "110");
+        assert_eq!(routes[0].name, "Route A");
+        assert_eq!(routes[0].switch_changeable_flg, Some("1".to_string()));
+        assert_eq!(routes[1].id, "120");
+        assert_eq!(routes[1].name, "Route B");
+    }
+
+    #[tokio::test]
+    async fn test_parse_stations_xml() {
+        let xml = r#"
+            <id>001</id>
+            <name>Station A</name>
+            <id>002</id>
+            <name>Station B</name>
+        "#;
+
+        let stations = parse_stations(xml).expect("Failed to parse stations");
+        assert_eq!(stations.len(), 2);
+        assert_eq!(stations[0].id, "001");
+        assert_eq!(stations[0].name, "Station A");
     }
 }

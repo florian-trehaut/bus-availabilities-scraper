@@ -133,7 +133,6 @@ impl TimeFilter {
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct Route {
     pub id: String,
     pub name: String,
@@ -141,39 +140,12 @@ pub struct Route {
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct Station {
     pub id: String,
     pub name: String,
 }
 
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub struct AvailableDate {
-    pub id: String,
-    pub name: String,
-}
-
-#[derive(Debug, Serialize)]
-pub struct AvailabilityResult {
-    pub timestamp: String,
-    pub route_id: String,
-    pub route_name: String,
-    pub departure_id: String,
-    pub departure_name: String,
-    pub arrival_id: String,
-    pub arrival_name: String,
-    pub date: String,
-    pub available_dates: Vec<DateSlot>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct DateSlot {
-    pub id: String,
-    pub name: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Hash, PartialEq, Eq)]
 pub struct BusSchedule {
     pub bus_number: String,
     pub route_name: String,
@@ -187,7 +159,7 @@ pub struct BusSchedule {
     pub available_plans: Vec<PricingPlan>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Hash, PartialEq, Eq)]
 pub struct PricingPlan {
     pub plan_id: u32,
     pub plan_index: u32,
@@ -197,16 +169,14 @@ pub struct PricingPlan {
     pub availability: SeatAvailability,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Hash, PartialEq, Eq)]
 #[serde(tag = "status", rename_all = "snake_case")]
-#[allow(dead_code)]
 pub enum SeatAvailability {
     Available { remaining_seats: Option<u32> },
-    SoldOut,
-    Unknown,
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 

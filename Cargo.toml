@@ -24,3 +24,28 @@ sea-orm = { version = "1.1", features = ["sqlx-sqlite", "runtime-tokio-rustls", 
 sea-orm-migration = { version = "1.1", features = ["sqlx-sqlite", "runtime-tokio-rustls"] }
 uuid = { version = "1.11", features = ["v4", "serde"] }
 migration = { path = "migration" }
+xxhash-rust = { version = "0.8", features = ["xxh64"] }
+once_cell = "1.19"
+
+[dev-dependencies]
+wiremock = "0.5"
+
+[lints.rust]
+unsafe_code = "forbid"
+dead_code = "deny"
+unused_imports = "deny"
+unused_variables = "deny"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+unwrap_used = "deny"
+expect_used = "warn"
+panic = "deny"
+todo = "deny"
+
+[profile.release]
+opt-level = 'z'
+lto = true
+codegen-units = 1
+strip = true

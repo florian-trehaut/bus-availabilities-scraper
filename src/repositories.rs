@@ -1,7 +1,8 @@
-use crate::entities::{prelude::*, route_states, user_routes, users};
+use crate::entities::{prelude::*, route_states, user_passengers, user_routes, users};
 use crate::error::{Result, ScraperError};
 use chrono::Utc;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
@@ -50,42 +51,49 @@ impl PassengerDetails {
 #[derive(Debug, Clone)]
 pub struct RouteStateDetails {
     pub last_seen_hash: String,
-    #[allow(dead_code)]
-    pub last_check: Option<chrono::DateTime<Utc>>,
-    #[allow(dead_code)]
-    pub total_checks: i64,
-    #[allow(dead_code)]
-    pub total_alerts: i64,
 }
 
 pub async fn get_all_active_user_routes(
     db: &DatabaseConnection,
 ) -> Result<Vec<UserRouteWithDetails>> {
-    let users_list = Users::find()
+    // Query 1: Get all enabled users with their routes (uses JOIN internally)
+    let users_with_routes: Vec<(users::Model, Vec<user_routes::Model>)> = Users::find()
         .filter(users::Column::Enabled.eq(true))
+        .find_with_related(UserRoutes)
         .all(db)
         .await
-        .map_err(|e| ScraperError::Config(format!("Failed to fetch users: {}", e)))?;
+        .map_err(|e| ScraperError::Config(format!("Failed to fetch users with routes: {}", e)))?;
 
+    // Collect all route IDs for batch passenger query
+    let route_ids: Vec<Uuid> = users_with_routes
+        .iter()
+        .flat_map(|(_, routes)| routes.iter().map(|r| r.id))
+        .collect();
+
+    if route_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // Query 2: Get all passengers in one query
+    let all_passengers: Vec<user_passengers::Model> = UserPassengers::find()
+        .filter(user_passengers::Column::UserRouteId.is_in(route_ids))
+        .all(db)
+        .await
+        .map_err(|e| ScraperError::Config(format!("Failed to fetch passengers: {}", e)))?;
+
+    // Index passengers by route_id for O(1) lookup
+    let passengers_map: HashMap<Uuid, user_passengers::Model> = all_passengers
+        .into_iter()
+        .map(|p| (p.user_route_id, p))
+        .collect();
+
+    // Build result
     let mut result = Vec::new();
-
-    for user in users_list {
-        let routes = UserRoutes::find()
-            .filter(user_routes::Column::UserId.eq(user.id))
-            .all(db)
-            .await
-            .map_err(|e| ScraperError::Config(format!("Failed to fetch user routes: {}", e)))?;
-
+    for (user, routes) in users_with_routes {
         for route in routes {
-            let passengers = UserPassengers::find_by_id(route.id)
-                .one(db)
-                .await
-                .map_err(|e| {
-                    ScraperError::Config(format!("Failed to fetch passengers: {}", e))
-                })?
-                .ok_or_else(|| {
-                    ScraperError::Config(format!("No passengers found for route {}", route.id))
-                })?;
+            let passengers = passengers_map.get(&route.id).ok_or_else(|| {
+                ScraperError::Config(format!("No passengers found for route {}", route.id))
+            })?;
 
             result.push(UserRouteWithDetails {
                 user_route_id: route.id,
@@ -129,9 +137,6 @@ pub async fn get_route_state(
 
     Ok(state.map(|s| RouteStateDetails {
         last_seen_hash: s.last_seen_hash,
-        last_check: s.last_check,
-        total_checks: s.total_checks,
-        total_alerts: s.total_alerts,
     }))
 }
 
@@ -148,16 +153,24 @@ pub async fn update_route_state(
 
     match existing {
         Some(state) => {
-            let mut active_model: route_states::ActiveModel = state.into();
-            active_model.last_seen_hash = Set(hash);
-            active_model.last_check = Set(Some(Utc::now()));
-            active_model.total_checks = Set(active_model.total_checks.unwrap() + 1);
-            if increment_alerts {
-                active_model.total_alerts = Set(active_model.total_alerts.unwrap() + 1);
-            }
-            active_model.update(db).await.map_err(|e| {
-                ScraperError::Config(format!("Failed to update route state: {}", e))
-            })?;
+            let new_total_checks = state.total_checks + 1;
+            let new_total_alerts = if increment_alerts {
+                state.total_alerts + 1
+            } else {
+                state.total_alerts
+            };
+
+            let active_model = route_states::ActiveModel {
+                user_route_id: Set(user_route_id),
+                last_seen_hash: Set(hash),
+                last_check: Set(Some(Utc::now())),
+                total_checks: Set(new_total_checks),
+                total_alerts: Set(new_total_alerts),
+            };
+            active_model
+                .update(db)
+                .await
+                .map_err(|e| ScraperError::Config(format!("Failed to update route state: {e}")))?;
         }
         None => {
             let new_state = route_states::ActiveModel {
@@ -165,21 +178,19 @@ pub async fn update_route_state(
                 last_seen_hash: Set(hash),
                 last_check: Set(Some(Utc::now())),
                 total_checks: Set(1),
-                total_alerts: Set(if increment_alerts { 1 } else { 0 }),
+                total_alerts: Set(i64::from(increment_alerts)),
             };
-            new_state.insert(db).await.map_err(|e| {
-                ScraperError::Config(format!("Failed to insert route state: {}", e))
-            })?;
+            new_state
+                .insert(db)
+                .await
+                .map_err(|e| ScraperError::Config(format!("Failed to insert route state: {e}")))?;
         }
     }
 
     Ok(())
 }
 
-pub async fn get_station_name(
-    db: &DatabaseConnection,
-    station_id: &str,
-) -> Result<Option<String>> {
+pub async fn get_station_name(db: &DatabaseConnection, station_id: &str) -> Result<Option<String>> {
     let station = Stations::find_by_id(station_id)
         .one(db)
         .await
@@ -189,6 +200,7 @@ pub async fn get_station_name(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
     use crate::db::init_database;
@@ -273,8 +285,6 @@ mod tests {
         let state = get_route_state(&db, route_id).await.unwrap();
         assert!(state.is_some());
         assert_eq!(state.as_ref().unwrap().last_seen_hash, "hash1");
-        assert_eq!(state.as_ref().unwrap().total_checks, 1);
-        assert_eq!(state.as_ref().unwrap().total_alerts, 0);
 
         update_route_state(&db, route_id, "hash2".to_string(), true)
             .await
@@ -282,7 +292,5 @@ mod tests {
 
         let state = get_route_state(&db, route_id).await.unwrap();
         assert_eq!(state.as_ref().unwrap().last_seen_hash, "hash2");
-        assert_eq!(state.as_ref().unwrap().total_checks, 2);
-        assert_eq!(state.as_ref().unwrap().total_alerts, 1);
     }
 }
