@@ -3,13 +3,10 @@
 //! These tests verify that server-side rendering works correctly
 //! for all routes without panicking.
 
+#![allow(clippy::unwrap_used)]
+
 use app::{components::App, db};
-use axum::{
-    Router,
-    body::Body,
-    http::{Request, StatusCode},
-    routing::get,
-};
+use axum::{Router, body::Body, http::Request, routing::get};
 use leptos::context::provide_context;
 use leptos::prelude::*;
 use leptos_axum::{LeptosRoutes, generate_route_list};
@@ -74,8 +71,8 @@ async fn setup_test_app() -> (Router<()>, DatabaseConnection) {
 
 /// Test that the /users page renders without panicking
 ///
-/// This test reproduces the spawn_local panic that occurs when
-/// ServerAction or Effect is used incorrectly in SSR context.
+/// This test reproduces the `spawn_local` panic that occurs when
+/// `ServerAction` or Effect is used incorrectly in SSR context.
 #[tokio::test]
 async fn test_users_page_ssr_no_panic() {
     let (app, _db) = setup_test_app().await;
@@ -90,7 +87,7 @@ async fn test_users_page_ssr_no_panic() {
     // Should return 200, not panic
     assert_eq!(
         response.status(),
-        StatusCode::OK,
+        axum::http::StatusCode::OK,
         "Expected 200 OK for /users page SSR"
     );
 }
@@ -106,7 +103,7 @@ async fn test_home_page_ssr_no_panic() {
 
     assert_eq!(
         response.status(),
-        StatusCode::OK,
+        axum::http::StatusCode::OK,
         "Expected 200 OK for home page SSR"
     );
 }
