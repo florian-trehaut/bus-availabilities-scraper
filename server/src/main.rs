@@ -103,15 +103,20 @@ async fn main() -> anyhow::Result<()> {
             "/api/{*fn_name}",
             get(server_fn_handler).post(server_fn_handler),
         )
-        .leptos_routes_with_context(&state, routes, {
-            let db = state.db.clone();
-            move || {
-                provide_context(db.clone());
-            }
-        }, {
-            let options = state.leptos_options.clone();
-            move || shell(options.clone())
-        })
+        .leptos_routes_with_context(
+            &state,
+            routes,
+            {
+                let db = state.db.clone();
+                move || {
+                    provide_context(db.clone());
+                }
+            },
+            {
+                let options = state.leptos_options.clone();
+                move || shell(options.clone())
+            },
+        )
         .fallback(file_and_error_handler)
         .nest_service("/pkg", ServeDir::new("target/site/pkg"))
         .with_state(state);

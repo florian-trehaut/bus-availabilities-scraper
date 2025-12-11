@@ -249,10 +249,12 @@ mod tests {
 
         let result = range.dates();
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Start date must be before end date"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Start date must be before end date")
+        );
     }
 
     #[test]

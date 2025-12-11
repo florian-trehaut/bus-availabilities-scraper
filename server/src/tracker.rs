@@ -2,14 +2,14 @@ use app::{
     error,
     notifier::{DiscordNotifier, NotificationContext},
     repositories::{
-        get_all_active_user_routes, get_route_state, get_station_name, update_route_state,
-        UserRouteWithDetails,
+        UserRouteWithDetails, get_all_active_user_routes, get_route_state, get_station_name,
+        update_route_state,
     },
     scraper::BusScraper,
     types::{self, DateRange, PassengerCount, ScrapeRequest, TimeFilter},
 };
 use sea_orm::DatabaseConnection;
-use std::collections::{hash_map::DefaultHasher, HashSet};
+use std::collections::{HashSet, hash_map::DefaultHasher};
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use std::time::Duration;

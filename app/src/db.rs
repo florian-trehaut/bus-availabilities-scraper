@@ -8,8 +8,8 @@ pub async fn init_database(database_url: &str) -> Result<DatabaseConnection> {
 }
 
 #[cfg(feature = "ssr")]
-pub fn get_db_from_context(
-) -> std::result::Result<DatabaseConnection, leptos::prelude::ServerFnError> {
+pub fn get_db_from_context()
+-> std::result::Result<DatabaseConnection, leptos::prelude::ServerFnError> {
     use leptos::prelude::expect_context;
     Ok(expect_context::<DatabaseConnection>())
 }

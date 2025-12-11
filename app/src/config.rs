@@ -40,7 +40,11 @@ impl Config {
 
         let date_end = dotenvy::var("DATE_END").unwrap_or_else(|_| {
             Local::now()
-                .checked_add_signed(chrono::Duration::days(7)).map_or_else(|| Local::now().format("%Y%m%d").to_string(), |d| d.format("%Y%m%d").to_string())
+                .checked_add_signed(chrono::Duration::days(7))
+                .map_or_else(
+                    || Local::now().format("%Y%m%d").to_string(),
+                    |d| d.format("%Y%m%d").to_string(),
+                )
         });
 
         let date_range = DateRange {

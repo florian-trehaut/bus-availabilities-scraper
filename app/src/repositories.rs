@@ -143,9 +143,10 @@ pub async fn update_route_state(
         if increment_alerts {
             active_model.total_alerts = Set(active_model.total_alerts.unwrap() + 1);
         }
-        active_model.update(db).await.map_err(|e| {
-            ScraperError::Config(format!("Failed to update route state: {e}"))
-        })?;
+        active_model
+            .update(db)
+            .await
+            .map_err(|e| ScraperError::Config(format!("Failed to update route state: {e}")))?;
     } else {
         let new_state = route_states::ActiveModel {
             user_route_id: Set(user_route_id),
@@ -154,9 +155,10 @@ pub async fn update_route_state(
             total_checks: Set(1),
             total_alerts: Set(if increment_alerts { 1 } else { 0 }),
         };
-        new_state.insert(db).await.map_err(|e| {
-            ScraperError::Config(format!("Failed to insert route state: {e}"))
-        })?;
+        new_state
+            .insert(db)
+            .await
+            .map_err(|e| ScraperError::Config(format!("Failed to insert route state: {e}")))?;
     }
 
     Ok(())

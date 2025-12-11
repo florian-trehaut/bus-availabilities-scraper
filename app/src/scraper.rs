@@ -1,8 +1,8 @@
 use crate::error::{Result, ScraperError};
 use crate::html_parser;
 use crate::types::{BusSchedule, Route, ScrapeRequest, Station};
-use quick_xml::events::Event;
 use quick_xml::Reader;
+use quick_xml::events::Event;
 use reqwest::Client;
 use std::time::Duration;
 use tracing::{debug, warn};
