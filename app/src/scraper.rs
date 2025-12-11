@@ -54,7 +54,14 @@ impl BusScraper {
     pub async fn fetch_routes(&self, area_id: u32) -> Result<Vec<Route>> {
         let url = format!("{}/ajaxPulldown", self.base_url);
         let xml = self
-            .fetch_with_retry(&url, &[("mode", "line:full"), ("id", &area_id.to_string())])
+            .fetch_with_retry(
+                &url,
+                &[
+                    ("mode", "line:full"),
+                    ("id", &area_id.to_string()),
+                    ("lang", "EN"),
+                ],
+            )
             .await?;
 
         parse_routes(&xml)
@@ -63,7 +70,10 @@ impl BusScraper {
     pub async fn fetch_departure_stations(&self, route_id: &str) -> Result<Vec<Station>> {
         let url = format!("{}/ajaxPulldown", self.base_url);
         let xml = self
-            .fetch_with_retry(&url, &[("mode", "station_geton"), ("id", route_id)])
+            .fetch_with_retry(
+                &url,
+                &[("mode", "station_geton"), ("id", route_id), ("lang", "EN")],
+            )
             .await?;
 
         parse_stations(&xml)
@@ -82,6 +92,7 @@ impl BusScraper {
                     ("mode", "station_getoff"),
                     ("id", route_id),
                     ("stationcd", departure_station),
+                    ("lang", "EN"),
                 ],
             )
             .await?;

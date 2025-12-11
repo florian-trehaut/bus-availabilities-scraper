@@ -9,7 +9,7 @@ pub struct Model {
     pub id: Uuid,
     pub user_id: Uuid,
     pub area_id: i32,
-    pub route_id: i32,
+    pub route_id: String,
     pub departure_station: String,
     pub arrival_station: String,
     pub date_start: String,

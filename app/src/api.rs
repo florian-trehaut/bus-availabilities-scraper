@@ -7,11 +7,22 @@ use uuid::Uuid;
 #[cfg(feature = "ssr")]
 use crate::{
     db,
-    entities::{prelude::*, routes, stations, user_passengers, user_routes, users},
+    entities::{prelude::*, user_passengers, user_routes, users},
+    scraper::BusScraper,
 };
 
 #[cfg(feature = "ssr")]
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
+
+#[cfg(feature = "ssr")]
+use std::sync::Arc;
+
+/// Get the `BusScraper` from Leptos context
+#[cfg(feature = "ssr")]
+pub fn get_scraper_from_context() -> Result<Arc<BusScraper>, ServerFnError> {
+    use leptos::prelude::expect_context;
+    Ok(expect_context::<Arc<BusScraper>>())
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct UserDto {
@@ -38,7 +49,7 @@ pub struct UserRouteDto {
     pub id: String,
     pub user_id: String,
     pub area_id: i32,
-    pub route_id: i32,
+    pub route_id: String,
     pub departure_station: String,
     pub arrival_station: String,
     pub date_start: String,
@@ -51,7 +62,7 @@ pub struct UserRouteDto {
 pub struct UserRouteFormDto {
     pub user_id: String,
     pub area_id: i32,
-    pub route_id: i32,
+    pub route_id: String,
     pub departure_station: String,
     pub arrival_station: String,
     pub date_start: String,
@@ -87,7 +98,7 @@ pub struct UserRouteWithPassengersDto {
     pub id: String,
     pub user_id: String,
     pub area_id: i32,
-    pub route_id: i32,
+    pub route_id: String,
     pub departure_station: String,
     pub arrival_station: String,
     pub date_start: String,
@@ -206,49 +217,71 @@ pub async fn delete_user(id: String) -> Result<(), ServerFnError> {
     Ok(())
 }
 
+/// Fetch routes from Highway Bus API for a given area
 #[server]
 pub async fn get_routes(area_id: i32) -> Result<Vec<RouteDto>, ServerFnError> {
-    let db = db::get_db_from_context()?;
+    use crate::translations::translate_route_name;
 
-    let routes = Routes::find()
-        .filter(routes::Column::AreaId.eq(area_id))
-        .all(&db)
+    let scraper = get_scraper_from_context()?;
+
+    let routes = scraper
+        .fetch_routes(area_id as u32)
         .await
-        .map_err(|e| ServerFnError::new(format!("Database error: {e}")))?;
+        .map_err(|e| ServerFnError::new(format!("Failed to fetch routes: {e}")))?;
 
     Ok(routes
         .into_iter()
         .map(|r| RouteDto {
-            route_id: r.route_id,
-            area_id: r.area_id,
-            name: r.name,
+            route_id: r.id,
+            area_id,
+            name: translate_route_name(&r.name),
         })
         .collect())
 }
 
+/// Fetch departure stations from Highway Bus API for a given route
 #[server]
-pub async fn get_stations_for_route(
-    route_id: i32,
-    area_id: i32,
-) -> Result<Vec<StationDto>, ServerFnError> {
-    let db = db::get_db_from_context()?;
+pub async fn get_departure_stations(route_id: String) -> Result<Vec<StationDto>, ServerFnError> {
+    use crate::translations::translate_station_name;
 
-    let stations = Stations::find()
-        .filter(
-            stations::Column::AreaId
-                .eq(area_id)
-                .and(stations::Column::RouteId.eq(route_id)),
-        )
-        .all(&db)
+    let scraper = get_scraper_from_context()?;
+
+    let stations = scraper
+        .fetch_departure_stations(&route_id)
         .await
-        .map_err(|e| ServerFnError::new(format!("Database error: {e}")))?;
+        .map_err(|e| ServerFnError::new(format!("Failed to fetch departure stations: {e}")))?;
 
     Ok(stations
         .into_iter()
         .map(|s| StationDto {
-            station_id: s.station_id,
-            name: s.name,
-            area_id: s.area_id,
+            station_id: s.id,
+            name: translate_station_name(&s.name),
+            area_id: 0, // Not relevant for live API
+        })
+        .collect())
+}
+
+/// Fetch arrival stations from Highway Bus API for a given route and departure station
+#[server]
+pub async fn get_arrival_stations(
+    route_id: String,
+    departure_station_id: String,
+) -> Result<Vec<StationDto>, ServerFnError> {
+    use crate::translations::translate_station_name;
+
+    let scraper = get_scraper_from_context()?;
+
+    let stations = scraper
+        .fetch_arrival_stations(&route_id, &departure_station_id)
+        .await
+        .map_err(|e| ServerFnError::new(format!("Failed to fetch arrival stations: {e}")))?;
+
+    Ok(stations
+        .into_iter()
+        .map(|s| StationDto {
+            station_id: s.id,
+            name: translate_station_name(&s.name),
+            area_id: 0, // Not relevant for live API
         })
         .collect())
 }

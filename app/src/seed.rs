@@ -1,52 +1,18 @@
 use crate::config::Config;
 use crate::entities::{prelude::*, user_passengers, user_routes, users};
-use crate::error::{Result, ScraperError};
+use crate::error::Result;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, IntoActiveModel, QueryFilter,
     Set,
 };
-use tracing::{info, warn};
+use tracing::info;
 use uuid::Uuid;
 
 pub async fn seed_from_env(db: &DatabaseConnection) -> Result<()> {
     let config = Config::from_env()?;
 
-    let route_id_str = config.request.route_id.to_string();
-    let route_exists = Routes::find_by_id(route_id_str.clone())
-        .one(db)
-        .await?
-        .is_some();
-
-    if !route_exists {
-        warn!(
-            "Route {} not found in catalog. Consider running SEED_ROUTES_CATALOG=true first.",
-            route_id_str
-        );
-    }
-
-    let departure_exists = Stations::find_by_id(config.request.departure_station.clone())
-        .one(db)
-        .await?
-        .is_some();
-
-    if !departure_exists {
-        return Err(ScraperError::Config(format!(
-            "Departure station {} not found in catalog",
-            config.request.departure_station
-        )));
-    }
-
-    let arrival_exists = Stations::find_by_id(config.request.arrival_station.clone())
-        .one(db)
-        .await?
-        .is_some();
-
-    if !arrival_exists {
-        return Err(ScraperError::Config(format!(
-            "Arrival station {} not found in catalog",
-            config.request.arrival_station
-        )));
-    }
+    // Routes and stations are now fetched from the live API, not from DB
+    // No validation needed here - the API will return errors if IDs are invalid
 
     let email = "beta@bus-scraper.local";
 
@@ -88,7 +54,7 @@ pub async fn seed_from_env(db: &DatabaseConnection) -> Result<()> {
     let existing_route = UserRoutes::find()
         .filter(user_routes::Column::UserId.eq(user_id))
         .filter(user_routes::Column::AreaId.eq(config.request.area_id as i32))
-        .filter(user_routes::Column::RouteId.eq(config.request.route_id as i32))
+        .filter(user_routes::Column::RouteId.eq(config.request.route_id.to_string()))
         .filter(user_routes::Column::DepartureStation.eq(&config.request.departure_station))
         .filter(user_routes::Column::ArrivalStation.eq(&config.request.arrival_station))
         .one(db)
@@ -121,7 +87,7 @@ pub async fn seed_from_env(db: &DatabaseConnection) -> Result<()> {
             id: Set(route_id),
             user_id: Set(user_id),
             area_id: Set(config.request.area_id as i32),
-            route_id: Set(config.request.route_id as i32),
+            route_id: Set(config.request.route_id.to_string()),
             departure_station: Set(config.request.departure_station.clone()),
             arrival_station: Set(config.request.arrival_station.clone()),
             date_start: Set(config.request.date_range.start.clone()),

@@ -2,18 +2,21 @@ use app::{
     error,
     notifier::{DiscordNotifier, NotificationContext},
     repositories::{
-        UserRouteWithDetails, get_all_active_user_routes, get_route_state, get_station_name,
-        update_route_state,
+        UserRouteWithDetails, get_all_active_user_routes, get_route_state, update_route_state,
     },
     scraper::BusScraper,
     types::{self, DateRange, PassengerCount, ScrapeRequest, TimeFilter},
 };
 use sea_orm::DatabaseConnection;
+use std::collections::HashMap;
 use std::collections::{HashSet, hash_map::DefaultHasher};
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{error, info, warn};
+
+/// Station name cache: `station_id` -> `station_name`
+pub type StationCache = Arc<tokio::sync::RwLock<HashMap<String, String>>>;
 
 pub async fn run_tracker(db: Arc<DatabaseConnection>) -> anyhow::Result<()> {
     let base_url =
@@ -29,6 +32,23 @@ pub async fn run_tracker(db: Arc<DatabaseConnection>) -> anyhow::Result<()> {
     }
 
     info!("Starting tracking for {} user route(s)", user_routes.len());
+
+    // Build station cache at startup by fetching all stations for user routes
+    let station_cache: StationCache = Arc::new(tokio::sync::RwLock::new(HashMap::new()));
+    info!("Building station name cache from API...");
+    for user_route in &user_routes {
+        if let Err(e) = populate_station_cache(&scraper, &station_cache, &user_route.route_id).await
+        {
+            warn!(
+                "Failed to cache stations for route {}: {}",
+                user_route.route_id, e
+            );
+        }
+    }
+    info!(
+        "Station cache built with {} entries",
+        station_cache.read().await.len()
+    );
 
     let unique_users: HashSet<String> = user_routes.iter().map(|r| r.email.clone()).collect();
 
@@ -52,6 +72,7 @@ pub async fn run_tracker(db: Arc<DatabaseConnection>) -> anyhow::Result<()> {
             user_route,
             scraper: Arc::clone(&scraper),
             db: Arc::clone(&db),
+            station_cache: Arc::clone(&station_cache),
             notifier: DiscordNotifier::new(),
         };
 
@@ -63,10 +84,24 @@ pub async fn run_tracker(db: Arc<DatabaseConnection>) -> anyhow::Result<()> {
     Ok(())
 }
 
+async fn populate_station_cache(
+    scraper: &BusScraper,
+    cache: &StationCache,
+    route_id: &str,
+) -> anyhow::Result<()> {
+    let stations = scraper.fetch_departure_stations(route_id).await?;
+    let mut cache_lock = cache.write().await;
+    for station in stations {
+        cache_lock.insert(station.id, station.name);
+    }
+    Ok(())
+}
+
 struct UserTracker {
     user_route: UserRouteWithDetails,
     scraper: Arc<BusScraper>,
     db: Arc<DatabaseConnection>,
+    station_cache: StationCache,
     notifier: DiscordNotifier,
 }
 
@@ -165,7 +200,7 @@ impl UserTracker {
     fn build_scrape_request(&self) -> ScrapeRequest {
         ScrapeRequest {
             area_id: self.user_route.area_id as u32,
-            route_id: self.user_route.route_id as u32,
+            route_id: self.user_route.route_id.parse().unwrap_or(0),
             departure_station: self.user_route.departure_station.clone(),
             arrival_station: self.user_route.arrival_station.clone(),
             date_range: DateRange {
@@ -196,12 +231,16 @@ impl UserTracker {
     }
 
     async fn build_notification_context(&self) -> error::Result<NotificationContext> {
-        let departure_name = get_station_name(&self.db, &self.user_route.departure_station)
-            .await?
+        let cache = self.station_cache.read().await;
+
+        let departure_name = cache
+            .get(&self.user_route.departure_station)
+            .cloned()
             .unwrap_or_else(|| format!("Station {}", self.user_route.departure_station));
 
-        let arrival_name = get_station_name(&self.db, &self.user_route.arrival_station)
-            .await?
+        let arrival_name = cache
+            .get(&self.user_route.arrival_station)
+            .cloned()
             .unwrap_or_else(|| format!("Station {}", self.user_route.arrival_station));
 
         Ok(NotificationContext {

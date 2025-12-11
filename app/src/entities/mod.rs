@@ -3,8 +3,6 @@
 pub mod prelude;
 
 pub mod route_states;
-pub mod routes;
-pub mod stations;
 pub mod user_passengers;
 pub mod user_routes;
 pub mod users;

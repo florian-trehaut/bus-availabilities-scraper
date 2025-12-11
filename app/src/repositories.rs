@@ -12,7 +12,7 @@ pub struct UserRouteWithDetails {
     pub scrape_interval_secs: i64,
     pub discord_webhook_url: Option<String>,
     pub area_id: i32,
-    pub route_id: i32,
+    pub route_id: String,
     pub departure_station: String,
     pub arrival_station: String,
     pub date_start: String,
@@ -164,15 +164,6 @@ pub async fn update_route_state(
     Ok(())
 }
 
-pub async fn get_station_name(db: &DatabaseConnection, station_id: &str) -> Result<Option<String>> {
-    let station = Stations::find_by_id(station_id)
-        .one(db)
-        .await
-        .map_err(|e| ScraperError::Config(format!("Failed to fetch station: {e}")))?;
-
-    Ok(station.map(|s| s.name))
-}
-
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -191,13 +182,6 @@ mod tests {
         let db = setup_test_db().await;
         let routes = get_all_active_user_routes(&db).await.unwrap();
         assert!(routes.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_get_station_name() {
-        let db = setup_test_db().await;
-        let name = get_station_name(&db, "001").await.unwrap();
-        assert_eq!(name, Some("Busta Shinjuku".to_string()));
     }
 
     #[tokio::test]
@@ -225,7 +209,7 @@ mod tests {
             id: Set(route_id),
             user_id: Set(user_id),
             area_id: Set(1),
-            route_id: Set(155),
+            route_id: Set("155".to_string()),
             departure_station: Set("001".to_string()),
             arrival_station: Set("498".to_string()),
             date_start: Set("2025-10-12".to_string()),

@@ -16,7 +16,7 @@ pub mod scraper;
 #[cfg(feature = "ssr")]
 pub mod seed;
 #[cfg(feature = "ssr")]
-pub mod seed_routes;
+pub mod translations;
 pub mod types;
 
 pub mod api;

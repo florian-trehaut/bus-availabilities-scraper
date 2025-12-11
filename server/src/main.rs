@@ -22,10 +22,11 @@ use tokio::signal;
 use tower_http::services::ServeDir;
 use tracing::{error, info};
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 struct AppState {
     leptos_options: LeptosOptions,
     db: DatabaseConnection,
+    scraper: Arc<BusScraper>,
 }
 
 impl FromRef<AppState> for LeptosOptions {
@@ -48,20 +49,10 @@ async fn main() -> anyhow::Result<()> {
     info!("Running migrations...");
     Migrator::up(&db, None).await?;
 
-    let should_seed_routes = dotenvy::var("SEED_ROUTES_CATALOG")
-        .map(|v| v == "true")
-        .unwrap_or(false);
-
-    if should_seed_routes {
-        info!("Seeding routes catalog from Highway Bus API...");
-        let temp_scraper = BusScraper::new(
-            dotenvy::var("BASE_URL")
-                .unwrap_or_else(|_| "https://www.highwaybus.com/gp".to_string()),
-        )?;
-        if let Err(e) = app::seed_routes::seed_routes_catalog(&db, &temp_scraper).await {
-            error!("Failed to seed routes catalog: {}", e);
-        }
-    }
+    // Create scraper for live API fetching
+    let base_url =
+        dotenvy::var("BASE_URL").unwrap_or_else(|_| "https://www.highwaybus.com/gp".to_string());
+    let scraper = Arc::new(BusScraper::new(base_url)?);
 
     let should_seed = dotenvy::var("SEED_FROM_ENV")
         .map(|v| v == "true")
@@ -81,6 +72,7 @@ async fn main() -> anyhow::Result<()> {
     let state = AppState {
         leptos_options,
         db: db.clone(),
+        scraper: scraper.clone(),
     };
 
     let db_for_tracker = Arc::new(db);
@@ -110,8 +102,10 @@ async fn main() -> anyhow::Result<()> {
             routes,
             {
                 let db = state.db.clone();
+                let scraper = state.scraper.clone();
                 move || {
                     provide_context(db.clone());
+                    provide_context(scraper.clone());
                 }
             },
             {
@@ -158,6 +152,7 @@ async fn server_fn_handler(State(state): State<AppState>, req: Request<Body>) ->
     handle_server_fns_with_context(
         move || {
             provide_context(state.db.clone());
+            provide_context(state.scraper.clone());
         },
         req,
     )
@@ -179,6 +174,7 @@ async fn file_and_error_handler(State(state): State<AppState>, req: Request<Body
     let handler = leptos_axum::render_app_to_stream_with_context(
         move || {
             provide_context(state.db.clone());
+            provide_context(state.scraper.clone());
         },
         move || shell(options.clone()),
     );
