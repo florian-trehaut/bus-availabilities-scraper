@@ -1,495 +1,352 @@
-# Highway Bus Availability Scraper
+# Claude Code Configuration - SPARC Development Environment
 
-Scraper Rust pour monitorer la disponibilité des bus Highway Bus (Japon) - routes Shinjuku-Fuji Five Lakes.
+## 🚨 CRITICAL: CONCURRENT EXECUTION & FILE MANAGEMENT
 
-## Architecture du Projet
+**ABSOLUTE RULES**:
+1. ALL operations MUST be concurrent/parallel in a single message
+2. **NEVER save working files, text/mds and tests to the root folder**
+3. ALWAYS organize files in appropriate subdirectories
+4. **USE CLAUDE CODE'S TASK TOOL** for spawning agents concurrently, not just MCP
 
-### Workflow API (5 étapes hiérarchiques)
+### ⚡ GOLDEN RULE: "1 MESSAGE = ALL RELATED OPERATIONS"
 
-L'API suit la structure des dropdowns en cascade du site web :
+**MANDATORY PATTERNS:**
+- **TodoWrite**: ALWAYS batch ALL todos in ONE call (5-10+ todos minimum)
+- **Task tool (Claude Code)**: ALWAYS spawn ALL agents in ONE message with full instructions
+- **File operations**: ALWAYS batch ALL reads/writes/edits in ONE message
+- **Bash commands**: ALWAYS batch ALL terminal operations in ONE message
+- **Memory operations**: ALWAYS batch ALL memory store/retrieve in ONE message
 
-1. **Routes** → `fetch_routes(area_id)` - Toutes les routes d'une zone
-2. **Departure Stations** → `fetch_departure_stations(route_id)` - Stations de départ pour une route
-3. **Arrival Stations** → `fetch_arrival_stations(route_id, departure)` - Destinations valides
-4. **Available Dates** → `fetch_available_dates(route_id, departure, arrival)` - Dates disponibles
-5. **Schedules + Availability** → `fetch_schedules(request, date)` - Horaires précis + disponibilité + prix
+### 🎯 CRITICAL: Claude Code Task Tool for Agent Execution
 
-**Endpoints API** :
-- Étapes 1-4 : `https://www.highwaybus.com/gp/ajaxPulldown` (POST, XML)
-  - Paramètres : `mode` change selon l'étape (line:full, station_geton, station_getoff, date)
-- Étape 5 : `https://www.highwaybus.com/gp/reservation/rsvPlanList` (GET, HTML)
-  - 14 paramètres query incluant date, stations, et détails passagers
-- Headers **OBLIGATOIRES** : User-Agent + Referer (sinon block)
-
-### Structure des Modules
-
-```
-src/
-├── main.rs           # Entry point - multi-user scheduler tokio + logging
-├── scraper.rs        # Client HTTP + API calls + XML parsing
-├── html_parser.rs    # HTML parsing for schedules + availability
-├── types.rs          # Route, Station, BusSchedule, ScrapeRequest
-├── config.rs         # Legacy .env config (for SEED_FROM_ENV)
-├── error.rs          # ScraperError + Result alias
-├── db.rs             # Database connection init
-├── entities/         # SeaORM entities (users, routes, stations, etc.)
-├── repositories.rs   # Database queries (user_routes, route_state)
-├── notifier.rs       # Discord webhook notifications
-├── seed.rs           # Seed user from .env
-├── seed_routes.rs    # Seed routes catalog from API
-└── migration/        # Database migrations (SeaORM)
+**Claude Code's Task tool is the PRIMARY way to spawn agents:**
+```javascript
+// ✅ CORRECT: Use Claude Code's Task tool for parallel agent execution
+[Single Message]:
+  Task("Research agent", "Analyze requirements and patterns...", "researcher")
+  Task("Coder agent", "Implement core features...", "coder")
+  Task("Tester agent", "Create comprehensive tests...", "tester")
+  Task("Reviewer agent", "Review code quality...", "reviewer")
+  Task("Architect agent", "Design system architecture...", "system-architect")
 ```
 
-**src/scraper.rs** - Core
-- `BusScraper` avec reqwest + cookie store enabled
-- Parsers XML custom pour format non-standard (étapes 1-4)
-- HTML parser pour horaires + disponibilité (étape 5)
-- `check_availability_full()` : itère sur plage de dates et filtre par horaires
-- `fetch_schedules()` : récupère horaires + disponibilité pour une date
-- Retry logic avec exponential backoff sur 503 (MAX_RETRIES=3)
-- Headers requis sur toutes les requêtes
+**MCP tools are ONLY for coordination setup:**
+- `mcp__claude-flow__swarm_init` - Initialize coordination topology
+- `mcp__claude-flow__agent_spawn` - Define agent types for coordination
+- `mcp__claude-flow__task_orchestrate` - Orchestrate high-level workflows
 
-**src/html_parser.rs** - HTML parsing
-- `parse_schedules_html()` : parse page HTML des résultats de recherche
-- `extract_time()` : extrait horaires depuis éléments HTML
-- `extract_availability()` : parse hidden inputs pour disponibilité sièges
-- `parse_remaining_seats()` : regex pour extraire nombre de sièges restants
+### 📁 File Organization Rules
 
-**src/types.rs** - Data structures
-- `ScrapeRequest` : params de query (area, route, stations, date_range, passengers, time_filter)
-- `PassengerCount` : 8 catégories de passagers (adult/child/handicap × men/women)
-- `DateRange` : plage de dates de recherche avec méthode `dates()` pour générer toutes les dates
-- `TimeFilter` : filtrage optionnel par horaires (departure_min, departure_max)
-- `Route`, `Station`, `AvailableDate` : entités parsées du XML
-- `BusSchedule` : horaires complets + disponibilité + plans tarifaires
-- `PricingPlan` : plan tarifaire avec prix et disponibilité
-- `SeatAvailability` : enum (Available, SoldOut, Unknown)
-- `AvailabilityResult` : legacy output avec dates disponibles
+**NEVER save to root folder. Use these directories:**
+- `/src` - Source code files
+- `/tests` - Test files
+- `/docs` - Documentation and markdown files
+- `/config` - Configuration files
+- `/scripts` - Utility scripts
+- `/examples` - Example code
 
-**src/config.rs** - Legacy environment config
-- Load `.env` via dotenvy
-- Parse et valide tous les params
-- Return `Config` avec `ScrapeRequest`
-- **Usage** : Uniquement pour `SEED_FROM_ENV=true` (migration legacy → DB)
+## Project Overview
 
-**src/db.rs** + **src/entities/** - Database layer
-- SeaORM avec SQLite
-- Entities : `users`, `user_routes`, `user_passengers`, `route_states`, `routes`, `stations`
-- Init database + connection pool
+This project uses SPARC (Specification, Pseudocode, Architecture, Refinement, Completion) methodology with Claude-Flow orchestration for systematic Test-Driven Development.
 
-**src/repositories.rs** - Database queries
-- `get_all_active_user_routes()` : fetch tous les users actifs avec leurs routes + passengers
-- `get_route_state()` / `update_route_state()` : tracking hash pour notify_on_change_only
-- `get_station_name()` : lookup nom station depuis catalog
+## SPARC Commands
 
-**src/notifier.rs** - Discord webhooks
-- `send_startup_notification()` : notif au démarrage (user_count, route_count)
-- `send_availability_alert()` : notif disponibilité avec embeds formatés
-- Non-bloquant : log errors mais ne fail pas
+### Core Commands
+- `npx claude-flow sparc modes` - List available modes
+- `npx claude-flow sparc run <mode> "<task>"` - Execute specific mode
+- `npx claude-flow sparc tdd "<feature>"` - Run complete TDD workflow
+- `npx claude-flow sparc info <mode>` - Get mode details
 
-**src/seed.rs** - Seed user from .env
-- Crée user + user_route + passengers depuis `.env`
-- Validation : vérifie que route_id et stations existent dans catalog
+### Batchtools Commands
+- `npx claude-flow sparc batch <modes> "<task>"` - Parallel execution
+- `npx claude-flow sparc pipeline "<task>"` - Full pipeline processing
+- `npx claude-flow sparc concurrent <mode> "<tasks-file>"` - Multi-task processing
 
-**src/seed_routes.rs** - Seed routes catalog from API
-- Scrape toutes les routes de area_id via `fetch_routes()`
-- Pour chaque route : scrape departure + arrival stations
-- Insert dans tables `routes` + `stations` avec dedup
-- Run once avec `SEED_ROUTES_CATALOG=true`
+### Build Commands
+- `npm run build` - Build project
+- `npm run test` - Run tests
+- `npm run lint` - Linting
+- `npm run typecheck` - Type checking
 
-**src/error.rs** - Error handling
-- `ScraperError` : Http, Parse, Config, ServiceUnavailable, InvalidResponse
-- Auto-conversion depuis reqwest::Error (check 503 status)
-- Type alias `Result<T>`
+## SPARC Workflow Phases
 
-**src/main.rs** - Multi-user scheduler
-- Load tous les users actifs depuis DB via `get_all_active_user_routes()`
-- Spawn 1 tokio task par user_route avec intervalle personnalisé
-- Chaque task : `tokio::time::interval` + `MissedTickBehavior::Skip`
-- Hash-based state tracking pour `notify_on_change_only`
-- Graceful shutdown sur SIGTERM/SIGINT
+1. **Specification** - Requirements analysis (`sparc run spec-pseudocode`)
+2. **Pseudocode** - Algorithm design (`sparc run spec-pseudocode`)
+3. **Architecture** - System design (`sparc run architect`)
+4. **Refinement** - TDD implementation (`sparc tdd`)
+5. **Completion** - Integration (`sparc run integration`)
 
-### Parsing XML Non-Standard
+## Code Style & Best Practices
 
-Format API inhabituel - multiples éléments avec même tag au même niveau :
+- **Modular Design**: Files under 500 lines
+- **Environment Safety**: Never hardcode secrets
+- **Test-First**: Write tests before implementation
+- **Clean Architecture**: Separate concerns
+- **Documentation**: Keep updated
 
-```xml
+## 🚀 Available Agents (54 Total)
 
-  2
-  110
-  Route A
-  120
-  Route B
+### Core Development
+`coder`, `reviewer`, `tester`, `planner`, `researcher`
 
-```
+### Swarm Coordination
+`hierarchical-coordinator`, `mesh-coordinator`, `adaptive-coordinator`, `collective-intelligence-coordinator`, `swarm-memory-manager`
 
-**Solution** : Parsers stateful custom (`parse_routes`, `parse_stations`, `parse_dates`)
-- Accumuler `current_id` + `current_name`
-- Flush record complet quand nouveau `<id>` détecté
-- Utilise `quick-xml` avec state machine
+### Consensus & Distributed
+`byzantine-coordinator`, `raft-manager`, `gossip-coordinator`, `consensus-builder`, `crdt-synchronizer`, `quorum-manager`, `security-manager`
 
-### Patterns HTTP Client
+### Performance & Optimization
+`perf-analyzer`, `performance-benchmarker`, `task-orchestrator`, `memory-coordinator`, `smart-agent`
 
-- **Cookies** : Client builder avec `.cookie_store(true)` pour session persistence
-- **Retry** : Exponential backoff **uniquement sur 503** ; autres erreurs = fail fast
-- **Rate limiting** : Implicite via scheduler interval + delays additionnels dans retry
-- **Headers** : User-Agent + Referer sur CHAQUE requête
+### GitHub & Repository
+`github-modes`, `pr-manager`, `code-review-swarm`, `issue-tracker`, `release-manager`, `workflow-automation`, `project-board-sync`, `repo-architect`, `multi-repo-swarm`
 
-## Architecture Base de Données
+### SPARC Methodology
+`sparc-coord`, `sparc-coder`, `specification`, `pseudocode`, `architecture`, `refinement`
 
-### Tables (SeaORM + SQLite)
+### Specialized Development
+`backend-dev`, `mobile-dev`, `ml-developer`, `cicd-engineer`, `api-docs`, `system-architect`, `code-analyzer`, `base-template-generator`
 
-**`users`** - Configuration globale par utilisateur
-- `id` (UUID, PK)
-- `email` (TEXT)
-- `enabled` (BOOLEAN)
-- `notify_on_change_only` (BOOLEAN)
-- `scrape_interval_secs` (INT)
-- `discord_webhook_url` (TEXT nullable)
-- `created_at` (TIMESTAMP)
+### Testing & Validation
+`tdd-london-swarm`, `production-validator`
 
-**`user_routes`** - Routes suivies par user (1:N avec users)
-- `id` (UUID, PK)
-- `user_id` (UUID, FK → users)
-- `area_id`, `route_id` (INT)
-- `departure_station`, `arrival_station` (TEXT)
-- `date_start`, `date_end` (TEXT, format YYYY-MM-DD)
-- `departure_time_min`, `departure_time_max` (TEXT nullable, HH:MM)
-- `created_at` (TIMESTAMP)
+### Migration & Planning
+`migration-planner`, `swarm-init`
 
-**`user_passengers`** - Config passagers par route (1:1 avec user_routes)
-- `user_route_id` (UUID, PK + FK)
-- 8 colonnes passagers (INT) : `adult_men`, `adult_women`, etc.
+## 🎯 Claude Code vs MCP Tools
 
-**`route_states`** - State tracking pour notify_on_change_only
-- `user_route_id` (UUID, PK + FK)
-- `last_seen_hash` (TEXT) : hash des schedules disponibles
-- `last_check` (TIMESTAMP)
-- `total_checks`, `total_alerts` (INT)
+### Claude Code Handles ALL EXECUTION:
+- **Task tool**: Spawn and run agents concurrently for actual work
+- File operations (Read, Write, Edit, MultiEdit, Glob, Grep)
+- Code generation and programming
+- Bash commands and system operations
+- Implementation work
+- Project navigation and analysis
+- TodoWrite and task management
+- Git operations
+- Package management
+- Testing and debugging
 
-**`routes`** - Catalogue Highway Bus (référence)
-- `route_id` (TEXT, PK)
-- `area_id` (INT)
-- `name` (TEXT)
-- `switch_changeable_flg` (TEXT nullable)
-- `created_at` (TIMESTAMP)
-- Index sur `area_id`
+### MCP Tools ONLY COORDINATE:
+- Swarm initialization (topology setup)
+- Agent type definitions (coordination patterns)
+- Task orchestration (high-level planning)
+- Memory management
+- Neural features
+- Performance tracking
+- GitHub integration
 
-**`stations`** - Catalogue stations (référence)
-- `station_id` (TEXT, PK)
-- `name` (TEXT)
-- `area_id` (INT)
-- `route_id` (INT nullable) : première route associée
-- `created_at` (TIMESTAMP)
-- Index composite sur `(area_id, route_id)`
+**KEY**: MCP coordinates the strategy, Claude Code's Task tool executes with real agents.
 
-### Workflow de Seeding
-
-**1. First run - Peupler catalogue (run once)**
-```bash
-SEED_ROUTES_CATALOG=true cargo run
-```
-Scrape toutes routes + stations de area_id=1 via API → tables `routes` + `stations`
-
-**2. Seed user depuis .env (optionnel)**
-```bash
-SEED_FROM_ENV=true cargo run
-```
-Crée user + user_route + passengers depuis `.env` → validation contre catalog
-
-**3. Run normal**
-```bash
-cargo run
-```
-Load users actifs depuis DB → spawn 1 task/route avec intervalle personnalisé
-
-## Configuration (.env)
-
-### Variables de seeding
-```bash
-# Database
-DATABASE_URL=sqlite://data/bus_scraper.db?mode=rwc
-
-# Seed routes catalog (run once)
-SEED_ROUTES_CATALOG=false
-
-# Seed user from .env (legacy migration)
-SEED_FROM_ENV=false
-```
-
-### Variables pour SEED_FROM_ENV (legacy)
-```bash
-# Geographic area (1 = Tokyo/Shinjuku)
-AREA_ID=1
-
-# Route to monitor
-# 110 = Shinjuku-Fuji Five Lakes
-# 155 = Shinjuku-Kamikochi
-ROUTE_ID=155
-
-# Station codes
-DEPARTURE_STATION=001  # Busta Shinjuku
-ARRIVAL_STATION=498    # Kamikochi Bus Terminal
-
-# Date range (ISO 8601 or YYYYMMDD)
-DATE_START=2025-10-12
-DATE_END=2025-10-19
-
-# Time filter (optional, HH:MM format)
-DEPARTURE_TIME_MIN=06:00
-DEPARTURE_TIME_MAX=10:00
-
-# Passenger counts (8 categories, total 1-12)
-ADULT_MEN=1
-ADULT_WOMEN=0
-CHILD_MEN=0
-CHILD_WOMEN=0
-HANDICAP_ADULT_MEN=0
-HANDICAP_ADULT_WOMEN=0
-HANDICAP_CHILD_MEN=0
-HANDICAP_CHILD_WOMEN=0
-
-# Query interval in seconds (default 300 = 5 minutes)
-SCRAPE_INTERVAL_SECS=300
-```
-
-Copier `.env.example` → `.env` avant de run.
-
-## Commandes
+## 🚀 Quick Setup
 
 ```bash
-# Check
-cargo check
-
-# Format + Lint + Test (AVANT CHAQUE COMMIT)
-cargo fmt --all
-cargo clippy --all-targets -- -D warnings
-cargo test
-
-# Run
-cargo run
-
-# Build release
-cargo build --release
+# Add MCP servers (Claude Flow required, others optional)
+claude mcp add claude-flow npx claude-flow@alpha mcp start
+claude mcp add ruv-swarm npx ruv-swarm mcp start  # Optional: Enhanced coordination
+claude mcp add flow-nexus npx flow-nexus@latest mcp start  # Optional: Cloud features
 ```
 
-## Configuration Clippy STRICTE
+## MCP Tool Categories
 
-### Cargo.toml - Lints
+### Coordination
+`swarm_init`, `agent_spawn`, `task_orchestrate`
 
-```toml
-[package]
-edition = "2021"
+### Monitoring
+`swarm_status`, `agent_list`, `agent_metrics`, `task_status`, `task_results`
 
-[lints.rust]
-unsafe_code = "forbid"
-dead_code = "deny"
-unused_imports = "deny"
-unused_variables = "deny"
+### Memory & Neural
+`memory_usage`, `neural_status`, `neural_train`, `neural_patterns`
 
-[lints.clippy]
-all = { level = "deny", priority = -1 }
-pedantic = { level = "warn", priority = -1 }
+### GitHub Integration
+`github_swarm`, `repo_analyze`, `pr_enhance`, `issue_triage`, `code_review`
 
-# Critiques
-unwrap_used = "deny"           # Jamais .unwrap()
-expect_used = "deny"           # Jamais .expect()
-panic = "deny"                 # Jamais panic!()
-todo = "deny"                  # Pas de TODO en prod
-indexing_slicing = "warn"      # Attention aux []
-cognitive_complexity = "warn"  # Max 15 (voir clippy.toml)
+### System
+`benchmark_run`, `features_detect`, `swarm_monitor`
 
-# Performance
-inefficient_to_string = "deny"
-needless_collect = "deny"
+### Flow-Nexus MCP Tools (Optional Advanced Features)
+Flow-Nexus extends MCP capabilities with 70+ cloud-based orchestration tools:
 
-[profile.release]
-lto = true
-codegen-units = 1
-strip = true
+**Key MCP Tool Categories:**
+- **Swarm & Agents**: `swarm_init`, `swarm_scale`, `agent_spawn`, `task_orchestrate`
+- **Sandboxes**: `sandbox_create`, `sandbox_execute`, `sandbox_upload` (cloud execution)
+- **Templates**: `template_list`, `template_deploy` (pre-built project templates)
+- **Neural AI**: `neural_train`, `neural_patterns`, `seraphina_chat` (AI assistant)
+- **GitHub**: `github_repo_analyze`, `github_pr_manage` (repository management)
+- **Real-time**: `execution_stream_subscribe`, `realtime_subscribe` (live monitoring)
+- **Storage**: `storage_upload`, `storage_list` (cloud file management)
+
+**Authentication Required:**
+- Register: `mcp__flow-nexus__user_register` or `npx flow-nexus@latest register`
+- Login: `mcp__flow-nexus__user_login` or `npx flow-nexus@latest login`
+- Access 70+ specialized MCP tools for advanced orchestration
+
+## 🚀 Agent Execution Flow with Claude Code
+
+### The Correct Pattern:
+
+1. **Optional**: Use MCP tools to set up coordination topology
+2. **REQUIRED**: Use Claude Code's Task tool to spawn agents that do actual work
+3. **REQUIRED**: Each agent runs hooks for coordination
+4. **REQUIRED**: Batch all operations in single messages
+
+### Example Full-Stack Development:
+
+```javascript
+// Single message with all agent spawning via Claude Code's Task tool
+[Parallel Agent Execution]:
+  Task("Backend Developer", "Build REST API with Express. Use hooks for coordination.", "backend-dev")
+  Task("Frontend Developer", "Create React UI. Coordinate with backend via memory.", "coder")
+  Task("Database Architect", "Design PostgreSQL schema. Store schema in memory.", "code-analyzer")
+  Task("Test Engineer", "Write Jest tests. Check memory for API contracts.", "tester")
+  Task("DevOps Engineer", "Setup Docker and CI/CD. Document in memory.", "cicd-engineer")
+  Task("Security Auditor", "Review authentication. Report findings via hooks.", "reviewer")
+  
+  // All todos batched together
+  TodoWrite { todos: [...8-10 todos...] }
+  
+  // All file operations together
+  Write "backend/server.js"
+  Write "frontend/App.jsx"
+  Write "database/schema.sql"
 ```
 
-### clippy.toml
+## 📋 Agent Coordination Protocol
 
-```toml
-cognitive-complexity-threshold = 15    # Défaut: 25
-too-many-arguments-threshold = 5       # Défaut: 7
-too-many-lines-threshold = 100         # Défaut: 100
-disallowed-names = ["foo", "bar", "baz"]
-```
+### Every Agent Spawned via Task Tool MUST:
 
-## Règles de Code NON-NÉGOCIABLES
-
-### 1. Error Handling
-
-```rust
-// ❌ INTERDIT
-let data = result.unwrap();
-let data = result.expect("failed");
-
-// ✅ OBLIGATOIRE
-let data = result?;
-let data = result.map_err(|e| ScraperError::from(e))?;
-```
-
-### 2. HTTP Patterns Spécifiques
-
-```rust
-// Headers OBLIGATOIRES sur toutes les requêtes
-let response = client
-    .post("https://www.highwaybus.com/gp/ajaxPulldown")
-    .header("User-Agent", "Mozilla/5.0 ...")
-    .header("Referer", "https://www.highwaybus.com/")
-    .form(&params)
-    .send()
-    .await?;
-```
-
-### 3. Retry Logic
-
-```rust
-// Retry UNIQUEMENT sur 503 Service Unavailable
-const MAX_RETRIES: u32 = 3;
-
-for attempt in 0..MAX_RETRIES {
-    match make_request().await {
-        Ok(data) => return Ok(data),
-        Err(e) if is_503_error(&e) && attempt < MAX_RETRIES - 1 => {
-            let delay = Duration::from_secs(2u64.pow(attempt));
-            tokio::time::sleep(delay).await;
-            continue;
-        }
-        Err(e) => return Err(e),
-    }
-}
-```
-
-### 4. XML Parsing Pattern
-
-```rust
-// Parser stateful pour XML non-standard
-let mut reader = Reader::from_str(xml);
-let mut current_id = String::new();
-let mut current_name = String::new();
-let mut results = Vec::new();
-
-loop {
-    match reader.read_event()? {
-        Event::Start(e) if e.name().as_ref() == b"id" => {
-            // Nouveau ID → flush previous si complet
-            if !current_id.is_empty() && !current_name.is_empty() {
-                results.push(Route { id: current_id, name: current_name });
-                current_id = String::new();
-                current_name = String::new();
-            }
-        }
-        Event::Text(e) => {
-            // Accumuler text...
-        }
-        Event::Eof => break,
-        _ => {}
-    }
-}
-```
-
-### 5. Scheduler Pattern
-
-```rust
-#[tokio::main]
-async fn main() -> Result {
-    let config = Config::load()?;
-    let scraper = BusScraper::new();
-    
-    let mut interval = tokio::time::interval(
-        Duration::from_secs(config.interval_secs)
-    );
-    interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
-    
-    loop {
-        interval.tick().await;
-        
-        match scraper.fetch_availability(&config.request).await {
-            Ok(result) => tracing::info!("Success: {:?}", result),
-            Err(e) => tracing::error!("Error: {}", e),
-        }
-    }
-}
-```
-
-## Dépendances
-
-```toml
-[dependencies]
-tokio = { version = "1.42", features = ["full"] }
-reqwest = { version = "0.12", features = ["cookies", "json"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-quick-xml = "0.36"
-dotenvy = "0.15"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-anyhow = "1.0"
-chrono = { version = "0.4", features = ["serde"] }
-scraper = "0.20"  # HTML parsing
-regex = "1.10"    # Seat extraction
-```
-
-## Workflow Strict
-
-### Pre-commit (obligatoire)
-
+**1️⃣ BEFORE Work:**
 ```bash
-#!/bin/bash
-cargo fmt --all -- --check || exit 1
-cargo clippy --all-targets -- -D warnings || exit 1
-cargo test || exit 1
+npx claude-flow@alpha hooks pre-task --description "[task]"
+npx claude-flow@alpha hooks session-restore --session-id "swarm-[id]"
 ```
 
-Installer : `cp pre-commit .git/hooks/ && chmod +x .git/hooks/pre-commit`
-
-### Checklist avant commit
-
-- [ ] `cargo fmt --all`
-- [ ] `cargo clippy --all-targets -- -D warnings` (0 warning)
-- [ ] `cargo test` (tous passent)
-- [ ] Pas de `.unwrap()` ou `.expect()` sans `#[allow]`
-- [ ] Complexity < 15 par fonction
-
-## Points d'Attention Spécifiques
-
-### API Highway Bus
-
-1. **Session cookies** : Le client doit persister les cookies entre requêtes
-2. **Headers obligatoires** : Sans User-Agent + Referer → block 403
-3. **Rate limiting** : Respecter interval minimum (5 minutes recommandé)
-4. **Retry sur 503** : API renvoie parfois 503 temporaire → retry avec backoff
-
-### XML Non-Standard
-
-1. Pas de structure hiérarchique classique
-2. Elements `<id>` et `<name>` au même niveau, répétés
-3. Parser custom requis - ne pas utiliser de deserializer automatique
-4. Toujours valider que `id` et `name` sont appariés
-
-### Production
-
-1. **Logs structurés** : JSON format pour parsing facile
-2. **Timestamps UTC** : Utiliser chrono avec UTC explicite
-3. **Graceful shutdown** : Handle SIGTERM/SIGINT proprement
-4. **Health checks** : Exposer endpoint /health si déployé avec monitoring
-
-## Debugging
-
+**2️⃣ DURING Work:**
 ```bash
-# Logs détaillés
-RUST_LOG=debug cargo run
-
-# Logs HTTP reqwest
-RUST_LOG=reqwest=debug cargo run
-
-# Logs projet uniquement
-RUST_LOG=highway_bus_scraper=trace cargo run
-
-# Test parsing XML
-cargo test parse_routes -- --nocapture
+npx claude-flow@alpha hooks post-edit --file "[file]" --memory-key "swarm/[agent]/[step]"
+npx claude-flow@alpha hooks notify --message "[what was done]"
 ```
+
+**3️⃣ AFTER Work:**
+```bash
+npx claude-flow@alpha hooks post-task --task-id "[task]"
+npx claude-flow@alpha hooks session-end --export-metrics true
+```
+
+## 🎯 Concurrent Execution Examples
+
+### ✅ CORRECT WORKFLOW: MCP Coordinates, Claude Code Executes
+
+```javascript
+// Step 1: MCP tools set up coordination (optional, for complex tasks)
+[Single Message - Coordination Setup]:
+  mcp__claude-flow__swarm_init { topology: "mesh", maxAgents: 6 }
+  mcp__claude-flow__agent_spawn { type: "researcher" }
+  mcp__claude-flow__agent_spawn { type: "coder" }
+  mcp__claude-flow__agent_spawn { type: "tester" }
+
+// Step 2: Claude Code Task tool spawns ACTUAL agents that do the work
+[Single Message - Parallel Agent Execution]:
+  // Claude Code's Task tool spawns real agents concurrently
+  Task("Research agent", "Analyze API requirements and best practices. Check memory for prior decisions.", "researcher")
+  Task("Coder agent", "Implement REST endpoints with authentication. Coordinate via hooks.", "coder")
+  Task("Database agent", "Design and implement database schema. Store decisions in memory.", "code-analyzer")
+  Task("Tester agent", "Create comprehensive test suite with 90% coverage.", "tester")
+  Task("Reviewer agent", "Review code quality and security. Document findings.", "reviewer")
+  
+  // Batch ALL todos in ONE call
+  TodoWrite { todos: [
+    {id: "1", content: "Research API patterns", status: "in_progress", priority: "high"},
+    {id: "2", content: "Design database schema", status: "in_progress", priority: "high"},
+    {id: "3", content: "Implement authentication", status: "pending", priority: "high"},
+    {id: "4", content: "Build REST endpoints", status: "pending", priority: "high"},
+    {id: "5", content: "Write unit tests", status: "pending", priority: "medium"},
+    {id: "6", content: "Integration tests", status: "pending", priority: "medium"},
+    {id: "7", content: "API documentation", status: "pending", priority: "low"},
+    {id: "8", content: "Performance optimization", status: "pending", priority: "low"}
+  ]}
+  
+  // Parallel file operations
+  Bash "mkdir -p app/{src,tests,docs,config}"
+  Write "app/package.json"
+  Write "app/src/server.js"
+  Write "app/tests/server.test.js"
+  Write "app/docs/API.md"
+```
+
+### ❌ WRONG (Multiple Messages):
+```javascript
+Message 1: mcp__claude-flow__swarm_init
+Message 2: Task("agent 1")
+Message 3: TodoWrite { todos: [single todo] }
+Message 4: Write "file.js"
+// This breaks parallel coordination!
+```
+
+## Performance Benefits
+
+- **84.8% SWE-Bench solve rate**
+- **32.3% token reduction**
+- **2.8-4.4x speed improvement**
+- **27+ neural models**
+
+## Hooks Integration
+
+### Pre-Operation
+- Auto-assign agents by file type
+- Validate commands for safety
+- Prepare resources automatically
+- Optimize topology by complexity
+- Cache searches
+
+### Post-Operation
+- Auto-format code
+- Train neural patterns
+- Update memory
+- Analyze performance
+- Track token usage
+
+### Session Management
+- Generate summaries
+- Persist state
+- Track metrics
+- Restore context
+- Export workflows
+
+## Advanced Features (v2.0.0)
+
+- 🚀 Automatic Topology Selection
+- ⚡ Parallel Execution (2.8-4.4x speed)
+- 🧠 Neural Training
+- 📊 Bottleneck Analysis
+- 🤖 Smart Auto-Spawning
+- 🛡️ Self-Healing Workflows
+- 💾 Cross-Session Memory
+- 🔗 GitHub Integration
+
+## Integration Tips
+
+1. Start with basic swarm init
+2. Scale agents gradually
+3. Use memory for context
+4. Monitor progress regularly
+5. Train patterns from success
+6. Enable hooks automation
+7. Use GitHub tools first
+
+## Support
+
+- Documentation: https://github.com/ruvnet/claude-flow
+- Issues: https://github.com/ruvnet/claude-flow/issues
+- Flow-Nexus Platform: https://flow-nexus.ruv.io (registration required for cloud features)
+
+---
+
+Remember: **Claude Flow coordinates, Claude Code creates!**
+
+# important-instruction-reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
+Never save working files, text/mds and tests to the root folder.

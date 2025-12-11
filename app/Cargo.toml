@@ -1,0 +1,69 @@
+[package]
+name = "app"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Leptos
+leptos = { workspace = true }
+leptos_meta.workspace = true
+leptos_router.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+# Database (server-only)
+sea-orm = { workspace = true, optional = true }
+migration = { workspace = true, optional = true }
+
+# Utilities
+uuid.workspace = true
+chrono.workspace = true
+anyhow.workspace = true
+
+# Parsing
+quick-xml.workspace = true
+scraper.workspace = true
+regex.workspace = true
+
+# Hashing (deterministic)
+xxhash-rust.workspace = true
+
+# Lazy initialization
+once_cell.workspace = true
+
+# Async utilities
+futures = { workspace = true, optional = true }
+
+# HTTP client (server-only)
+reqwest = { workspace = true, optional = true }
+dotenvy = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+
+# Logging
+tracing.workspace = true
+
+# WASM
+wasm-bindgen.workspace = true
+web-sys = { workspace = true, features = ["Window"] }
+console_error_panic_hook = { workspace = true, optional = true }
+
+[features]
+hydrate = ["leptos/hydrate", "leptos/csr"]
+ssr = [
+    "leptos/ssr",
+    "dep:sea-orm",
+    "dep:migration",
+    "dep:reqwest",
+    "dep:dotenvy",
+    "dep:tokio",
+    "dep:futures",
+]
+
+[dev-dependencies]
+wiremock.workspace = true
+
+[lints]
+workspace = true

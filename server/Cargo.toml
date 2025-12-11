@@ -1,0 +1,39 @@
+[package]
+name = "server"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "server"
+path = "src/main.rs"
+
+[dependencies]
+app = { path = "../app", features = ["ssr"] }
+leptos = { workspace = true, features = ["ssr"] }
+leptos_axum.workspace = true
+leptos_meta.workspace = true
+leptos_router.workspace = true
+axum.workspace = true
+tokio.workspace = true
+tower = { workspace = true, features = ["util"] }
+tower-http.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+# Database
+sea-orm.workspace = true
+migration.workspace = true
+
+# Utilities
+uuid.workspace = true
+chrono.workspace = true
+anyhow.workspace = true
+dotenvy.workspace = true
+reqwest.workspace = true
+
+# Logging
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[lints]
+workspace = true

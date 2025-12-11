@@ -1,0 +1,23 @@
+#[cfg(feature = "ssr")]
+pub mod config;
+#[cfg(feature = "ssr")]
+pub mod db;
+#[cfg(feature = "ssr")]
+pub mod entities;
+pub mod error;
+#[cfg(feature = "ssr")]
+pub mod html_parser;
+#[cfg(feature = "ssr")]
+pub mod notifier;
+#[cfg(feature = "ssr")]
+pub mod repositories;
+#[cfg(feature = "ssr")]
+pub mod scraper;
+#[cfg(feature = "ssr")]
+pub mod seed;
+#[cfg(feature = "ssr")]
+pub mod seed_routes;
+pub mod types;
+
+pub mod api;
+pub mod components;

@@ -1,0 +1,27 @@
+[workspace]
+bin-package = "server"
+lib-package = "frontend"
+site-root = "target/site"
+site-pkg-dir = "pkg"
+style-file = "style/main.css"
+tailwind-input-file = "style/main.css"
+tailwind-config-file = "tailwind.config.js"
+browserquery = "defaults"
+watch = false
+env = "DEV"
+
+[[workspace.bin-features]]
+crate-name = "server"
+
+[[workspace.lib-features]]
+crate-name = "frontend"
+
+[build]
+command = "cargo"
+
+[env]
+LEPTOS_OUTPUT_NAME = "frontend"
+LEPTOS_SITE_ROOT = "target/site"
+LEPTOS_SITE_PKG_DIR = "pkg"
+LEPTOS_SITE_ADDR = "127.0.0.1:3000"
+LEPTOS_RELOAD_PORT = "3001"
