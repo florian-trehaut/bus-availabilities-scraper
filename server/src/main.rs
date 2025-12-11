@@ -1,3 +1,5 @@
+#![recursion_limit = "512"]
+
 mod tracker;
 
 use app::{components::App, db, scraper::BusScraper};

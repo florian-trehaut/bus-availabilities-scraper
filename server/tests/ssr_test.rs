@@ -3,6 +3,7 @@
 //! These tests verify that server-side rendering works correctly
 //! for all routes without panicking.
 
+#![recursion_limit = "512"]
 #![allow(clippy::unwrap_used)]
 
 use app::{components::App, db};

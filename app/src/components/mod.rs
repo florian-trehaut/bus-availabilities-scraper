@@ -5,6 +5,7 @@ use leptos_router::{
     components::{A, Route, Router, Routes},
 };
 
+pub mod user_routes;
 pub mod users;
 
 #[component]
@@ -19,6 +20,7 @@ pub fn App() -> impl IntoView {
                 <div class="container mx-auto flex gap-4">
                     <A href="/" attr:class="hover:text-blue-400">"Home"</A>
                     <A href="/users" attr:class="hover:text-blue-400">"Users"</A>
+                    <A href="/user-routes" attr:class="hover:text-blue-400">"Routes"</A>
                 </div>
             </nav>
 
@@ -26,6 +28,7 @@ pub fn App() -> impl IntoView {
                 <Routes fallback=|| "Page not found.">
                     <Route path=StaticSegment("") view=HomePage/>
                     <Route path=StaticSegment("users") view=users::UsersPage/>
+                    <Route path=StaticSegment("user-routes") view=user_routes::UserRoutesPage/>
                 </Routes>
             </main>
         </Router>

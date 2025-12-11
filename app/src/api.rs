@@ -82,6 +82,28 @@ pub struct StationDto {
     pub area_id: i32,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct UserRouteWithPassengersDto {
+    pub id: String,
+    pub user_id: String,
+    pub area_id: i32,
+    pub route_id: i32,
+    pub departure_station: String,
+    pub arrival_station: String,
+    pub date_start: String,
+    pub date_end: String,
+    pub departure_time_min: Option<String>,
+    pub departure_time_max: Option<String>,
+    pub adult_men: i16,
+    pub adult_women: i16,
+    pub child_men: i16,
+    pub child_women: i16,
+    pub handicap_adult_men: i16,
+    pub handicap_adult_women: i16,
+    pub handicap_child_men: i16,
+    pub handicap_child_women: i16,
+}
+
 #[server]
 pub async fn get_users() -> Result<Vec<UserDto>, ServerFnError> {
     let db = db::get_db_from_context()?;
@@ -287,4 +309,137 @@ pub async fn create_user_route(form: UserRouteFormDto) -> Result<UserRouteDto, S
         departure_time_min: route.departure_time_min,
         departure_time_max: route.departure_time_max,
     })
+}
+
+#[server]
+pub async fn get_user_routes(
+    user_id: String,
+) -> Result<Vec<UserRouteWithPassengersDto>, ServerFnError> {
+    let db = db::get_db_from_context()?;
+    let user_uuid = Uuid::parse_str(&user_id)
+        .map_err(|e| ServerFnError::new(format!("Invalid user UUID: {e}")))?;
+
+    let routes = UserRoutes::find()
+        .filter(user_routes::Column::UserId.eq(user_uuid))
+        .find_also_related(UserPassengers)
+        .all(&db)
+        .await
+        .map_err(|e| ServerFnError::new(format!("Database error: {e}")))?;
+
+    Ok(routes
+        .into_iter()
+        .map(|(route, passengers)| {
+            let p = passengers.unwrap_or(user_passengers::Model {
+                user_route_id: route.id,
+                adult_men: 0,
+                adult_women: 0,
+                child_men: 0,
+                child_women: 0,
+                handicap_adult_men: 0,
+                handicap_adult_women: 0,
+                handicap_child_men: 0,
+                handicap_child_women: 0,
+            });
+            UserRouteWithPassengersDto {
+                id: route.id.to_string(),
+                user_id: route.user_id.to_string(),
+                area_id: route.area_id,
+                route_id: route.route_id,
+                departure_station: route.departure_station,
+                arrival_station: route.arrival_station,
+                date_start: route.date_start,
+                date_end: route.date_end,
+                departure_time_min: route.departure_time_min,
+                departure_time_max: route.departure_time_max,
+                adult_men: p.adult_men,
+                adult_women: p.adult_women,
+                child_men: p.child_men,
+                child_women: p.child_women,
+                handicap_adult_men: p.handicap_adult_men,
+                handicap_adult_women: p.handicap_adult_women,
+                handicap_child_men: p.handicap_child_men,
+                handicap_child_women: p.handicap_child_women,
+            }
+        })
+        .collect())
+}
+
+#[server]
+pub async fn update_user_route(
+    id: String,
+    form: UserRouteFormDto,
+) -> Result<UserRouteDto, ServerFnError> {
+    let db = db::get_db_from_context()?;
+    let route_uuid =
+        Uuid::parse_str(&id).map_err(|e| ServerFnError::new(format!("Invalid route UUID: {e}")))?;
+
+    let route = UserRoutes::find_by_id(route_uuid)
+        .one(&db)
+        .await
+        .map_err(|e| ServerFnError::new(format!("Database error: {e}")))?
+        .ok_or_else(|| ServerFnError::new("Route not found".to_string()))?;
+
+    let mut active_route: user_routes::ActiveModel = route.into();
+    active_route.area_id = Set(form.area_id);
+    active_route.route_id = Set(form.route_id);
+    active_route.departure_station = Set(form.departure_station.clone());
+    active_route.arrival_station = Set(form.arrival_station.clone());
+    active_route.date_start = Set(form.date_start.clone());
+    active_route.date_end = Set(form.date_end.clone());
+    active_route.departure_time_min = Set(form.departure_time_min.clone());
+    active_route.departure_time_max = Set(form.departure_time_max.clone());
+
+    let updated_route = active_route
+        .update(&db)
+        .await
+        .map_err(|e| ServerFnError::new(format!("Failed to update route: {e}")))?;
+
+    let passengers = UserPassengers::find_by_id(route_uuid)
+        .one(&db)
+        .await
+        .map_err(|e| ServerFnError::new(format!("Database error: {e}")))?;
+
+    if let Some(p) = passengers {
+        let mut active_passengers: user_passengers::ActiveModel = p.into();
+        active_passengers.adult_men = Set(form.adult_men);
+        active_passengers.adult_women = Set(form.adult_women);
+        active_passengers.child_men = Set(form.child_men);
+        active_passengers.child_women = Set(form.child_women);
+        active_passengers.handicap_adult_men = Set(form.handicap_adult_men);
+        active_passengers.handicap_adult_women = Set(form.handicap_adult_women);
+        active_passengers.handicap_child_men = Set(form.handicap_child_men);
+        active_passengers.handicap_child_women = Set(form.handicap_child_women);
+
+        active_passengers
+            .update(&db)
+            .await
+            .map_err(|e| ServerFnError::new(format!("Failed to update passengers: {e}")))?;
+    }
+
+    Ok(UserRouteDto {
+        id: updated_route.id.to_string(),
+        user_id: updated_route.user_id.to_string(),
+        area_id: updated_route.area_id,
+        route_id: updated_route.route_id,
+        departure_station: updated_route.departure_station,
+        arrival_station: updated_route.arrival_station,
+        date_start: updated_route.date_start,
+        date_end: updated_route.date_end,
+        departure_time_min: updated_route.departure_time_min,
+        departure_time_max: updated_route.departure_time_max,
+    })
+}
+
+#[server]
+pub async fn delete_user_route(id: String) -> Result<(), ServerFnError> {
+    let db = db::get_db_from_context()?;
+    let route_uuid =
+        Uuid::parse_str(&id).map_err(|e| ServerFnError::new(format!("Invalid route UUID: {e}")))?;
+
+    UserRoutes::delete_by_id(route_uuid)
+        .exec(&db)
+        .await
+        .map_err(|e| ServerFnError::new(format!("Failed to delete route: {e}")))?;
+
+    Ok(())
 }
