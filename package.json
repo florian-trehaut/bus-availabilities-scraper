@@ -1,6 +1,13 @@
 {
+  "name": "bus-scraper-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug"
+  },
   "devDependencies": {
-    "@tailwindcss/cli": "^4.1.17",
-    "tailwindcss": "^3.4.19"
+    "@playwright/test": "^1.49.0"
   }
 }
