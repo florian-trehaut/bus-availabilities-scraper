@@ -325,3 +325,187 @@ fn read_text(reader: &mut Reader<&[u8]>) -> Result<String> {
         _ => Ok(String::new()),
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    // === parse_routes TESTS ===
+
+    #[test]
+    fn test_parse_routes_valid_xml() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<routes>
+    <id>110</id>
+    <name>新宿～富士五湖線</name>
+    <switchChangeableFlg>1</switchChangeableFlg>
+    <id>155</id>
+    <name>新宿～上高地線</name>
+    <switchChangeableFlg>0</switchChangeableFlg>
+</routes>"#;
+
+        let routes = parse_routes(xml).unwrap();
+        assert_eq!(routes.len(), 2);
+
+        assert_eq!(routes[0].id, "110");
+        assert_eq!(routes[0].name, "新宿～富士五湖線");
+        assert_eq!(routes[0].switch_changeable_flg, Some("1".to_string()));
+
+        assert_eq!(routes[1].id, "155");
+        assert_eq!(routes[1].name, "新宿～上高地線");
+        assert_eq!(routes[1].switch_changeable_flg, Some("0".to_string()));
+    }
+
+    #[test]
+    fn test_parse_routes_without_flag() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<routes>
+    <id>200</id>
+    <name>名古屋～福岡線</name>
+</routes>"#;
+
+        let routes = parse_routes(xml).unwrap();
+        assert_eq!(routes.len(), 1);
+        assert_eq!(routes[0].id, "200");
+        assert_eq!(routes[0].name, "名古屋～福岡線");
+        assert!(routes[0].switch_changeable_flg.is_none());
+    }
+
+    #[test]
+    fn test_parse_routes_empty_xml() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?><routes></routes>"#;
+
+        let routes = parse_routes(xml).unwrap();
+        assert!(routes.is_empty());
+    }
+
+    #[test]
+    fn test_parse_routes_single_route() {
+        let xml = r#"<id>123</id><name>Test Route</name>"#;
+
+        let routes = parse_routes(xml).unwrap();
+        assert_eq!(routes.len(), 1);
+        assert_eq!(routes[0].id, "123");
+        assert_eq!(routes[0].name, "Test Route");
+    }
+
+    #[test]
+    fn test_parse_routes_with_unicode() {
+        let xml = r#"<id>123</id><name>日本語ルート名 テスト</name>"#;
+
+        let routes = parse_routes(xml).unwrap();
+        assert_eq!(routes.len(), 1);
+        assert_eq!(routes[0].name, "日本語ルート名 テスト");
+    }
+
+    // === parse_stations TESTS ===
+
+    #[test]
+    fn test_parse_stations_valid_xml() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<stations>
+    <id>001</id>
+    <name>バスタ新宿（南口）</name>
+    <id>064</id>
+    <name>河口湖駅</name>
+    <id>498</id>
+    <name>上高地バスターミナル</name>
+</stations>"#;
+
+        let stations = parse_stations(xml).unwrap();
+        assert_eq!(stations.len(), 3);
+
+        assert_eq!(stations[0].id, "001");
+        assert_eq!(stations[0].name, "バスタ新宿（南口）");
+
+        assert_eq!(stations[1].id, "064");
+        assert_eq!(stations[1].name, "河口湖駅");
+
+        assert_eq!(stations[2].id, "498");
+        assert_eq!(stations[2].name, "上高地バスターミナル");
+    }
+
+    #[test]
+    fn test_parse_stations_empty_xml() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?><stations></stations>"#;
+
+        let stations = parse_stations(xml).unwrap();
+        assert!(stations.is_empty());
+    }
+
+    #[test]
+    fn test_parse_stations_single_station() {
+        let xml = r#"<id>001</id><name>Test Station</name>"#;
+
+        let stations = parse_stations(xml).unwrap();
+        assert_eq!(stations.len(), 1);
+        assert_eq!(stations[0].id, "001");
+        assert_eq!(stations[0].name, "Test Station");
+    }
+
+    #[test]
+    fn test_parse_stations_with_unicode() {
+        let xml = r#"<id>001</id><name>東京駅 八重洲口</name>"#;
+
+        let stations = parse_stations(xml).unwrap();
+        assert_eq!(stations.len(), 1);
+        assert_eq!(stations[0].name, "東京駅 八重洲口");
+    }
+
+    // === read_text TESTS ===
+
+    #[test]
+    fn test_read_text_with_content() {
+        let xml = "<root>Hello World</root>";
+        let mut reader = Reader::from_str(xml);
+        reader.config_mut().trim_text(true);
+
+        // Skip the opening tag
+        let mut buf = Vec::new();
+        let _ = reader.read_event_into(&mut buf);
+
+        let text = read_text(&mut reader).unwrap();
+        assert_eq!(text, "Hello World");
+    }
+
+    #[test]
+    fn test_read_text_with_special_chars() {
+        let xml = "<root>Test &amp; Special &lt;chars&gt;</root>";
+        let mut reader = Reader::from_str(xml);
+        reader.config_mut().trim_text(true);
+
+        let mut buf = Vec::new();
+        let _ = reader.read_event_into(&mut buf);
+
+        let text = read_text(&mut reader).unwrap();
+        assert_eq!(text, "Test & Special <chars>");
+    }
+
+    #[test]
+    fn test_read_text_empty_element() {
+        let xml = "<root></root>";
+        let mut reader = Reader::from_str(xml);
+        reader.config_mut().trim_text(true);
+
+        let mut buf = Vec::new();
+        let _ = reader.read_event_into(&mut buf);
+
+        let text = read_text(&mut reader).unwrap();
+        assert_eq!(text, "");
+    }
+
+    // === BusScraper TESTS ===
+
+    #[test]
+    fn test_bus_scraper_new_success() {
+        let scraper = BusScraper::new("https://example.com".to_string());
+        assert!(scraper.is_ok());
+    }
+
+    #[test]
+    fn test_bus_scraper_stores_base_url() {
+        let scraper = BusScraper::new("https://test.example.com".to_string()).unwrap();
+        assert_eq!(scraper.base_url, "https://test.example.com");
+    }
+}

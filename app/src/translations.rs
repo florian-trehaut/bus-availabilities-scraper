@@ -534,3 +534,129 @@ pub fn translate_station_name(japanese: &str) -> String {
         .get(japanese)
         .map_or_else(|| japanese.to_string(), |s| (*s).to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // === ROUTE NAME TRANSLATION TESTS ===
+
+    #[test]
+    fn test_translate_route_name_known_shinjuku_fuji() {
+        let result = translate_route_name("新宿～富士五湖線");
+        assert_eq!(result, "Shinjuku - Fuji Five Lakes");
+    }
+
+    #[test]
+    fn test_translate_route_name_known_nagoya_fukuoka() {
+        let result = translate_route_name("名古屋～福岡線");
+        assert_eq!(result, "Nagoya - Fukuoka");
+    }
+
+    #[test]
+    fn test_translate_route_name_known_haneda_tama() {
+        let result = translate_route_name("羽田多摩センター線");
+        assert_eq!(result, "Haneda - Tama Center");
+    }
+
+    #[test]
+    fn test_translate_route_name_unknown_returns_original() {
+        let result = translate_route_name("未知の路線");
+        assert_eq!(result, "未知の路線");
+    }
+
+    #[test]
+    fn test_translate_route_name_empty_string() {
+        let result = translate_route_name("");
+        assert_eq!(result, "");
+    }
+
+    // === STATION NAME TRANSLATION TESTS ===
+
+    #[test]
+    fn test_translate_station_name_known_shinjuku() {
+        let result = translate_station_name("バスタ新宿（南口）");
+        assert_eq!(result, "Shinjuku Expressway Bus Terminal (South Exit)");
+    }
+
+    #[test]
+    fn test_translate_station_name_known_kawaguchiko() {
+        let result = translate_station_name("河口湖駅");
+        assert_eq!(result, "Kawaguchiko Station");
+    }
+
+    #[test]
+    fn test_translate_station_name_known_fuji_highland() {
+        let result = translate_station_name("富士急ハイランド");
+        assert_eq!(result, "Fuji-Q Highland");
+    }
+
+    #[test]
+    fn test_translate_station_name_known_haneda() {
+        let result = translate_station_name("羽田空港第１ターミナル");
+        assert_eq!(result, "Haneda Airport Terminal 1");
+    }
+
+    #[test]
+    fn test_translate_station_name_unknown_returns_original() {
+        let result = translate_station_name("未知の駅");
+        assert_eq!(result, "未知の駅");
+    }
+
+    #[test]
+    fn test_translate_station_name_empty_string() {
+        let result = translate_station_name("");
+        assert_eq!(result, "");
+    }
+
+    // === LAZYLOCKS INITIALIZATION TESTS ===
+
+    #[test]
+    fn test_route_names_map_is_not_empty() {
+        assert!(!ROUTE_NAMES.is_empty());
+        assert!(ROUTE_NAMES.len() >= 50); // Should have at least 50 routes
+    }
+
+    #[test]
+    fn test_station_names_map_is_not_empty() {
+        assert!(!STATION_NAMES.is_empty());
+        assert!(STATION_NAMES.len() >= 200); // Should have at least 200 stations
+    }
+
+    #[test]
+    fn test_route_names_sample_entries_exist() {
+        // Verify key entries from different areas
+        assert!(ROUTE_NAMES.contains_key("新宿～富士五湖線")); // Area 1
+        assert!(ROUTE_NAMES.contains_key("名古屋～福岡線")); // Area 2
+        assert!(ROUTE_NAMES.contains_key("羽田多摩センター線")); // Area 3
+        assert!(ROUTE_NAMES.contains_key("新宿～松本線"));
+        assert!(ROUTE_NAMES.contains_key("新宿～名古屋線"));
+    }
+
+    #[test]
+    fn test_station_names_sample_entries_exist() {
+        // Verify key stations from different categories
+        assert!(STATION_NAMES.contains_key("バスタ新宿（南口）")); // Tokyo terminal
+        assert!(STATION_NAMES.contains_key("河口湖駅")); // Fuji area
+        assert!(STATION_NAMES.contains_key("名鉄バスセンター")); // Nagoya area
+        assert!(STATION_NAMES.contains_key("金沢駅")); // Hokuriku
+        assert!(STATION_NAMES.contains_key("羽田空港第１ターミナル")); // Airport
+        assert!(STATION_NAMES.contains_key("草津温泉バスターミナル")); // Onsen
+    }
+
+    #[test]
+    fn test_all_route_translations_are_non_empty() {
+        for (jp, en) in ROUTE_NAMES.iter() {
+            assert!(!jp.is_empty(), "Japanese route name should not be empty");
+            assert!(!en.is_empty(), "English route name should not be empty");
+        }
+    }
+
+    #[test]
+    fn test_all_station_translations_are_non_empty() {
+        for (jp, en) in STATION_NAMES.iter() {
+            assert!(!jp.is_empty(), "Japanese station name should not be empty");
+            assert!(!en.is_empty(), "English station name should not be empty");
+        }
+    }
+}

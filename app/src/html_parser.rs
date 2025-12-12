@@ -195,6 +195,8 @@ pub fn parse_remaining_seats(button_text: &str) -> Option<u32> {
 mod tests {
     use super::*;
 
+    // === parse_remaining_seats TESTS ===
+
     #[test]
     fn test_parse_remaining_seats_with_number() {
         assert_eq!(parse_remaining_seats("残り1席"), Some(1));
@@ -219,6 +221,8 @@ mod tests {
         assert_eq!(parse_remaining_seats(""), None);
         assert_eq!(parse_remaining_seats("invalid"), None);
     }
+
+    // === extract_time TESTS ===
 
     #[test]
     fn test_extract_time() {
@@ -250,5 +254,244 @@ mod tests {
         let element = document.select(&selector).next().unwrap();
 
         assert_eq!(extract_time(element, "arr").unwrap(), "8:30");
+    }
+
+    #[test]
+    fn test_extract_time_double_digit_hour() {
+        let html = r#"
+            <section>
+                <li class="dep">
+                    <p class="time">12:30 発</p>
+                </li>
+            </section>
+        "#;
+        let document = Html::parse_fragment(html);
+        let selector = Selector::parse("section").unwrap();
+        let element = document.select(&selector).next().unwrap();
+
+        assert_eq!(extract_time(element, "dep").unwrap(), "12:30");
+    }
+
+    #[test]
+    fn test_extract_time_missing_returns_error() {
+        let html = r#"<section><li class="dep"></li></section>"#;
+        let document = Html::parse_fragment(html);
+        let selector = Selector::parse("section").unwrap();
+        let element = document.select(&selector).next().unwrap();
+
+        assert!(extract_time(element, "dep").is_err());
+    }
+
+    // === extract_time_from_text TESTS ===
+
+    #[test]
+    fn test_extract_time_from_text_with_suffix() {
+        assert_eq!(extract_time_from_text("6:45 発").unwrap(), "6:45");
+        assert_eq!(extract_time_from_text("8:30 着").unwrap(), "8:30");
+    }
+
+    #[test]
+    fn test_extract_time_from_text_with_whitespace() {
+        assert_eq!(extract_time_from_text("  9:00  発  ").unwrap(), "9:00");
+    }
+
+    #[test]
+    fn test_extract_time_from_text_no_time_returns_error() {
+        assert!(extract_time_from_text("発").is_err());
+        assert!(extract_time_from_text("").is_err());
+    }
+
+    // === parse_schedules_html TESTS ===
+
+    #[test]
+    fn test_parse_schedules_html_single_bus() {
+        let html = r#"
+            <html><body>
+                <section class="busSvclistItem">
+                    <ul>
+                        <li class="dep"><p class="time">6:45 発</p></li>
+                        <li class="arr"><p class="time">8:30 着</p></li>
+                    </ul>
+                    <div class="planArea">
+                        <p class="price">12,000円</p>
+                        <form name="selectPlan">
+                            <input type="hidden" class="seat_0" value="1" data-index="0">
+                            <input type="hidden" name="discntPlanNo" value="12345">
+                            <button>残り3席</button>
+                        </form>
+                    </div>
+                </section>
+            </body></html>
+        "#;
+
+        let schedules = parse_schedules_html(html, "20251029").unwrap();
+        assert_eq!(schedules.len(), 1);
+        assert_eq!(schedules[0].departure_time, "6:45");
+        assert_eq!(schedules[0].arrival_time, "8:30");
+        assert_eq!(schedules[0].departure_date, "20251029");
+        assert_eq!(schedules[0].available_plans.len(), 1);
+        assert_eq!(schedules[0].available_plans[0].plan_id, 12345);
+        assert_eq!(schedules[0].available_plans[0].price, 12000);
+    }
+
+    #[test]
+    fn test_parse_schedules_html_multiple_buses() {
+        let html = r#"
+            <html><body>
+                <section class="busSvclistItem">
+                    <ul>
+                        <li class="dep"><p class="time">6:45 発</p></li>
+                        <li class="arr"><p class="time">8:30 着</p></li>
+                    </ul>
+                    <div class="planArea">
+                        <p class="price">12,000円</p>
+                        <form name="selectPlan">
+                            <input type="hidden" class="seat_0" value="1" data-index="0">
+                            <input type="hidden" name="discntPlanNo" value="12345">
+                            <button>残り3席</button>
+                        </form>
+                    </div>
+                </section>
+                <section class="busSvclistItem">
+                    <ul>
+                        <li class="dep"><p class="time">9:00 発</p></li>
+                        <li class="arr"><p class="time">11:15 着</p></li>
+                    </ul>
+                    <div class="planArea">
+                        <p class="price">10,500円</p>
+                        <form name="selectPlan">
+                            <input type="hidden" class="seat_0" value="1" data-index="0">
+                            <input type="hidden" name="discntPlanNo" value="12346">
+                            <button>残り8席</button>
+                        </form>
+                    </div>
+                </section>
+            </body></html>
+        "#;
+
+        let schedules = parse_schedules_html(html, "20251029").unwrap();
+        assert_eq!(schedules.len(), 2);
+        assert_eq!(schedules[0].departure_time, "6:45");
+        assert_eq!(schedules[1].departure_time, "9:00");
+    }
+
+    #[test]
+    fn test_parse_schedules_html_no_buses() {
+        let html = r#"<html><body><div>No buses available</div></body></html>"#;
+
+        let schedules = parse_schedules_html(html, "20251029").unwrap();
+        assert!(schedules.is_empty());
+    }
+
+    #[test]
+    fn test_parse_schedules_html_sold_out_excluded() {
+        let html = r#"
+            <html><body>
+                <section class="busSvclistItem">
+                    <ul>
+                        <li class="dep"><p class="time">12:30 発</p></li>
+                        <li class="arr"><p class="time">14:45 着</p></li>
+                    </ul>
+                    <div class="planArea">
+                        <p class="price">9,800円</p>
+                        <form name="selectPlan">
+                            <input type="hidden" class="seat_0" value="2" data-index="0">
+                            <input type="hidden" name="discntPlanNo" value="12347">
+                            <button>満席</button>
+                        </form>
+                    </div>
+                </section>
+            </body></html>
+        "#;
+
+        let schedules = parse_schedules_html(html, "20251029").unwrap();
+        assert_eq!(schedules.len(), 1);
+        // Sold out plans (seat_0 value="2") are excluded
+        assert!(schedules[0].available_plans.is_empty());
+    }
+
+    // === extract_plans_from_bus TESTS ===
+
+    #[test]
+    fn test_extract_plans_from_bus_available() {
+        let html = r#"
+            <section class="busSvclistItem">
+                <div class="planArea">
+                    <p class="price">12,000円</p>
+                    <form name="selectPlan">
+                        <input type="hidden" class="seat_0" value="1" data-index="0">
+                        <input type="hidden" name="discntPlanNo" value="12345">
+                        <button>残り3席</button>
+                    </form>
+                </div>
+            </section>
+        "#;
+        let document = Html::parse_fragment(html);
+        let selector = Selector::parse("section.busSvclistItem").unwrap();
+        let element = document.select(&selector).next().unwrap();
+
+        let plans = extract_plans_from_bus(element).unwrap();
+        assert_eq!(plans.len(), 1);
+        assert_eq!(plans[0].plan_id, 12345);
+        assert_eq!(plans[0].price, 12000);
+        match &plans[0].availability {
+            SeatAvailability::Available { remaining_seats } => {
+                assert_eq!(*remaining_seats, Some(3));
+            }
+        }
+    }
+
+    #[test]
+    fn test_extract_plans_from_bus_sold_out_excluded() {
+        let html = r#"
+            <section class="busSvclistItem">
+                <div class="planArea">
+                    <p class="price">9,800円</p>
+                    <form name="selectPlan">
+                        <input type="hidden" class="seat_0" value="2" data-index="0">
+                        <input type="hidden" name="discntPlanNo" value="12347">
+                        <button>満席</button>
+                    </form>
+                </div>
+            </section>
+        "#;
+        let document = Html::parse_fragment(html);
+        let selector = Selector::parse("section.busSvclistItem").unwrap();
+        let element = document.select(&selector).next().unwrap();
+
+        let plans = extract_plans_from_bus(element).unwrap();
+        assert!(plans.is_empty());
+    }
+
+    // === extract_value_attribute TESTS ===
+
+    #[test]
+    fn test_extract_value_attribute_valid() {
+        let html = r#"<input type="hidden" value="5">"#;
+        let document = Html::parse_fragment(html);
+        let selector = Selector::parse("input").unwrap();
+        let element = document.select(&selector).next().unwrap();
+
+        assert_eq!(extract_value_attribute(element).unwrap(), 5);
+    }
+
+    #[test]
+    fn test_extract_value_attribute_missing() {
+        let html = r#"<input type="hidden">"#;
+        let document = Html::parse_fragment(html);
+        let selector = Selector::parse("input").unwrap();
+        let element = document.select(&selector).next().unwrap();
+
+        assert!(extract_value_attribute(element).is_err());
+    }
+
+    #[test]
+    fn test_extract_value_attribute_invalid_number() {
+        let html = r#"<input type="hidden" value="abc">"#;
+        let document = Html::parse_fragment(html);
+        let selector = Selector::parse("input").unwrap();
+        let element = document.select(&selector).next().unwrap();
+
+        assert!(extract_value_attribute(element).is_err());
     }
 }

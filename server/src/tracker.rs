@@ -262,7 +262,7 @@ impl UserTracker {
     }
 }
 
-fn calculate_state_hash(schedules: &[types::BusSchedule]) -> u64 {
+pub fn calculate_state_hash(schedules: &[types::BusSchedule]) -> u64 {
     let mut hasher = DefaultHasher::new();
 
     for schedule in schedules {
@@ -279,4 +279,251 @@ fn calculate_state_hash(schedules: &[types::BusSchedule]) -> u64 {
     }
 
     hasher.finish()
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use app::types::{BusSchedule, PricingPlan, SeatAvailability};
+
+    fn create_test_schedule(
+        departure_date: &str,
+        departure_time: &str,
+        plan_id: u32,
+        price: u32,
+        remaining_seats: Option<u32>,
+    ) -> BusSchedule {
+        BusSchedule {
+            bus_number: "Bus_1".to_string(),
+            route_name: "Test Route".to_string(),
+            departure_station: "001".to_string(),
+            departure_date: departure_date.to_string(),
+            departure_time: departure_time.to_string(),
+            arrival_station: "064".to_string(),
+            arrival_date: departure_date.to_string(),
+            arrival_time: "10:00".to_string(),
+            way_no: 1,
+            available_plans: vec![PricingPlan {
+                plan_id,
+                plan_index: 0,
+                plan_name: "Standard".to_string(),
+                price,
+                display_price: format!("{price}円"),
+                availability: SeatAvailability::Available { remaining_seats },
+            }],
+        }
+    }
+
+    #[test]
+    fn test_calculate_state_hash_empty_schedules() {
+        let schedules: Vec<BusSchedule> = vec![];
+        let hash = calculate_state_hash(&schedules);
+
+        // Empty schedules should produce a consistent hash
+        let hash2 = calculate_state_hash(&schedules);
+        assert_eq!(hash, hash2);
+    }
+
+    #[test]
+    fn test_calculate_state_hash_single_schedule() {
+        let schedules = vec![create_test_schedule(
+            "20250115",
+            "08:30",
+            12345,
+            2100,
+            Some(5),
+        )];
+        let hash = calculate_state_hash(&schedules);
+
+        // Same schedule should produce same hash
+        let schedules2 = vec![create_test_schedule(
+            "20250115",
+            "08:30",
+            12345,
+            2100,
+            Some(5),
+        )];
+        let hash2 = calculate_state_hash(&schedules2);
+        assert_eq!(hash, hash2);
+    }
+
+    #[test]
+    fn test_calculate_state_hash_different_dates() {
+        let schedules1 = vec![create_test_schedule(
+            "20250115",
+            "08:30",
+            12345,
+            2100,
+            Some(5),
+        )];
+        let schedules2 = vec![create_test_schedule(
+            "20250116",
+            "08:30",
+            12345,
+            2100,
+            Some(5),
+        )];
+
+        let hash1 = calculate_state_hash(&schedules1);
+        let hash2 = calculate_state_hash(&schedules2);
+
+        assert_ne!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_calculate_state_hash_different_times() {
+        let schedules1 = vec![create_test_schedule(
+            "20250115",
+            "08:30",
+            12345,
+            2100,
+            Some(5),
+        )];
+        let schedules2 = vec![create_test_schedule(
+            "20250115",
+            "09:00",
+            12345,
+            2100,
+            Some(5),
+        )];
+
+        let hash1 = calculate_state_hash(&schedules1);
+        let hash2 = calculate_state_hash(&schedules2);
+
+        assert_ne!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_calculate_state_hash_different_prices() {
+        let schedules1 = vec![create_test_schedule(
+            "20250115",
+            "08:30",
+            12345,
+            2100,
+            Some(5),
+        )];
+        let schedules2 = vec![create_test_schedule(
+            "20250115",
+            "08:30",
+            12345,
+            2500,
+            Some(5),
+        )];
+
+        let hash1 = calculate_state_hash(&schedules1);
+        let hash2 = calculate_state_hash(&schedules2);
+
+        assert_ne!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_calculate_state_hash_different_remaining_seats() {
+        let schedules1 = vec![create_test_schedule(
+            "20250115",
+            "08:30",
+            12345,
+            2100,
+            Some(5),
+        )];
+        let schedules2 = vec![create_test_schedule(
+            "20250115",
+            "08:30",
+            12345,
+            2100,
+            Some(3),
+        )];
+
+        let hash1 = calculate_state_hash(&schedules1);
+        let hash2 = calculate_state_hash(&schedules2);
+
+        assert_ne!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_calculate_state_hash_none_vs_some_seats() {
+        let schedules1 = vec![create_test_schedule("20250115", "08:30", 12345, 2100, None)];
+        let schedules2 = vec![create_test_schedule(
+            "20250115",
+            "08:30",
+            12345,
+            2100,
+            Some(5),
+        )];
+
+        let hash1 = calculate_state_hash(&schedules1);
+        let hash2 = calculate_state_hash(&schedules2);
+
+        assert_ne!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_calculate_state_hash_multiple_schedules() {
+        let schedules = vec![
+            create_test_schedule("20250115", "08:30", 12345, 2100, Some(5)),
+            create_test_schedule("20250115", "10:00", 12346, 2200, Some(3)),
+        ];
+        let hash = calculate_state_hash(&schedules);
+
+        // Same schedules in same order should produce same hash
+        let schedules2 = vec![
+            create_test_schedule("20250115", "08:30", 12345, 2100, Some(5)),
+            create_test_schedule("20250115", "10:00", 12346, 2200, Some(3)),
+        ];
+        let hash2 = calculate_state_hash(&schedules2);
+        assert_eq!(hash, hash2);
+    }
+
+    #[test]
+    fn test_calculate_state_hash_order_matters() {
+        let schedules1 = vec![
+            create_test_schedule("20250115", "08:30", 12345, 2100, Some(5)),
+            create_test_schedule("20250115", "10:00", 12346, 2200, Some(3)),
+        ];
+        let schedules2 = vec![
+            create_test_schedule("20250115", "10:00", 12346, 2200, Some(3)),
+            create_test_schedule("20250115", "08:30", 12345, 2100, Some(5)),
+        ];
+
+        let hash1 = calculate_state_hash(&schedules1);
+        let hash2 = calculate_state_hash(&schedules2);
+
+        // Order matters in hash calculation
+        assert_ne!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_calculate_state_hash_no_plans() {
+        let mut schedule = create_test_schedule("20250115", "08:30", 12345, 2100, Some(5));
+        schedule.available_plans.clear();
+        let schedules = vec![schedule];
+
+        let hash = calculate_state_hash(&schedules);
+
+        // Should still produce a valid hash based on date/time
+        assert!(hash > 0);
+    }
+
+    #[test]
+    fn test_calculate_state_hash_different_plan_ids() {
+        let schedules1 = vec![create_test_schedule(
+            "20250115",
+            "08:30",
+            12345,
+            2100,
+            Some(5),
+        )];
+        let schedules2 = vec![create_test_schedule(
+            "20250115",
+            "08:30",
+            99999,
+            2100,
+            Some(5),
+        )];
+
+        let hash1 = calculate_state_hash(&schedules1);
+        let hash2 = calculate_state_hash(&schedules2);
+
+        assert_ne!(hash1, hash2);
+    }
 }

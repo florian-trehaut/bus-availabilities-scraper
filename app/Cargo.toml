@@ -64,6 +64,8 @@ ssr = [
 
 [dev-dependencies]
 wiremock.workspace = true
+temp-env.workspace = true
+serial_test.workspace = true
 
 [lints]
 workspace = true

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<stations>
+    <id>001</id>
+    <name>バスタ新宿（南口）</name>
+    <id>064</id>
+    <name>河口湖駅</name>
+    <id>498</id>
+    <name>上高地バスターミナル</name>
+</stations>

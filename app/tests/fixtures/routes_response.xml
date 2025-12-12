@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<routes>
+    <id>110</id>
+    <name>新宿～富士五湖線</name>
+    <switchChangeableFlg>1</switchChangeableFlg>
+    <id>155</id>
+    <name>新宿～上高地線（さわやか信州号）</name>
+    <switchChangeableFlg>0</switchChangeableFlg>
+    <id>200</id>
+    <name>名古屋～福岡線</name>
+</routes>
