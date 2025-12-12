@@ -1,3 +1,4 @@
+use crate::tracker_impl;
 use app::{
     error,
     notifier::{DiscordNotifier, NotificationContext},
@@ -145,13 +146,14 @@ impl UserTracker {
         let state = get_route_state(&self.db, self.user_route.user_route_id).await?;
 
         let hash_str = format!("{current_hash}");
-        let state_changed = state.as_ref().is_none_or(|s| s.last_seen_hash != hash_str);
+        let last_hash = state.as_ref().map(|s| s.last_seen_hash.as_str());
+        let state_changed = tracker_impl::has_state_changed(last_hash, &hash_str);
 
-        let should_notify = if self.user_route.notify_on_change_only {
-            state_changed && !schedules_with_seats.is_empty()
-        } else {
-            !schedules_with_seats.is_empty()
-        };
+        let should_notify = tracker_impl::should_send_notification(
+            self.user_route.notify_on_change_only,
+            state_changed,
+            !schedules_with_seats.is_empty(),
+        );
 
         if should_notify {
             if let Some(ref webhook_url) = self.user_route.discord_webhook_url {

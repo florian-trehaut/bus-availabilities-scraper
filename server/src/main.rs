@@ -1,6 +1,7 @@
 #![recursion_limit = "512"]
 
 mod tracker;
+mod tracker_impl;
 
 use app::{components::App, db, scraper::BusScraper};
 use axum::extract::FromRef;
@@ -23,10 +24,10 @@ use tower_http::services::ServeDir;
 use tracing::{error, info};
 
 #[derive(Clone)]
-struct AppState {
-    leptos_options: LeptosOptions,
-    db: DatabaseConnection,
-    scraper: Arc<BusScraper>,
+pub struct AppState {
+    pub leptos_options: LeptosOptions,
+    pub db: DatabaseConnection,
+    pub scraper: Arc<BusScraper>,
 }
 
 impl FromRef<AppState> for LeptosOptions {

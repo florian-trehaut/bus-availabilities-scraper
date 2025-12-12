@@ -405,4 +405,105 @@ mod tests {
             assert!(err.contains("Maximum 12 passengers"));
         });
     }
+
+    #[test]
+    #[serial]
+    fn test_config_from_env_with_dotenv_loads_dotenv() {
+        // Test that from_env_with_dotenv(true) calls dotenvy::dotenv() (line 23)
+        let mut vars = all_config_vars_cleared();
+        vars.extend([
+            ("ROUTE_ID", Some("155")),
+            ("DEPARTURE_STATION", Some("001")),
+            ("ARRIVAL_STATION", Some("498")),
+        ]);
+        temp_env::with_vars(vars, || {
+            // With load_dotenv=true, dotenvy::dotenv() is called (line 23)
+            let result = Config::from_env_with_dotenv(true);
+            assert!(result.is_ok());
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn test_config_from_env_public_method() {
+        // Test Config::from_env() which always loads dotenv (line 15)
+        let mut vars = all_config_vars_cleared();
+        vars.extend([
+            ("ROUTE_ID", Some("155")),
+            ("DEPARTURE_STATION", Some("001")),
+            ("ARRIVAL_STATION", Some("498")),
+        ]);
+        temp_env::with_vars(vars, || {
+            let result = Config::from_env();
+            assert!(result.is_ok());
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn test_config_from_env_invalid_area_id() {
+        let mut vars = all_config_vars_cleared();
+        vars.extend([
+            ("ROUTE_ID", Some("155")),
+            ("DEPARTURE_STATION", Some("001")),
+            ("ARRIVAL_STATION", Some("498")),
+            ("AREA_ID", Some("not_a_number")),
+        ]);
+        temp_env::with_vars(vars, || {
+            let result = Config::from_env_with_dotenv(false);
+            assert!(result.is_err());
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn test_config_from_env_invalid_route_id() {
+        let mut vars = all_config_vars_cleared();
+        vars.extend([
+            ("ROUTE_ID", Some("not_a_number")),
+            ("DEPARTURE_STATION", Some("001")),
+            ("ARRIVAL_STATION", Some("498")),
+        ]);
+        temp_env::with_vars(vars, || {
+            let result = Config::from_env_with_dotenv(false);
+            assert!(result.is_err());
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn test_config_from_env_empty_discord_webhook_treated_as_none() {
+        let mut vars = all_config_vars_cleared();
+        vars.extend([
+            ("ROUTE_ID", Some("155")),
+            ("DEPARTURE_STATION", Some("001")),
+            ("ARRIVAL_STATION", Some("498")),
+            ("DISCORD_WEBHOOK_URL", Some("")), // Empty string
+        ]);
+        temp_env::with_vars(vars, || {
+            let result = Config::from_env_with_dotenv(false);
+            assert!(result.is_ok());
+            let config = result.unwrap();
+            assert!(config.discord_webhook_url.is_none());
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn test_config_from_env_empty_time_filters_treated_as_none() {
+        let mut vars = all_config_vars_cleared();
+        vars.extend([
+            ("ROUTE_ID", Some("155")),
+            ("DEPARTURE_STATION", Some("001")),
+            ("ARRIVAL_STATION", Some("498")),
+            ("DEPARTURE_TIME_MIN", Some("")), // Empty string
+            ("DEPARTURE_TIME_MAX", Some("")), // Empty string
+        ]);
+        temp_env::with_vars(vars, || {
+            let result = Config::from_env_with_dotenv(false);
+            assert!(result.is_ok());
+            let config = result.unwrap();
+            assert!(config.request.time_filter.is_none());
+        });
+    }
 }

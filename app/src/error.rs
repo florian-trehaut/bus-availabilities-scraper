@@ -7,9 +7,10 @@ pub enum ScraperError {
     Parse(String),
     Config(String),
     #[cfg(feature = "ssr")]
-    Database(sea_orm::DbErr),
+    Database(String),
     ServiceUnavailable,
     InvalidResponse(String),
+    NotFound(String),
 }
 
 impl fmt::Display for ScraperError {
@@ -20,9 +21,10 @@ impl fmt::Display for ScraperError {
             Self::Parse(e) => write!(f, "XML parse error: {e}"),
             Self::Config(msg) => write!(f, "Configuration error: {msg}"),
             #[cfg(feature = "ssr")]
-            Self::Database(e) => write!(f, "Database error: {e}"),
+            Self::Database(msg) => write!(f, "Database error: {msg}"),
             Self::ServiceUnavailable => write!(f, "Service temporarily unavailable (503)"),
             Self::InvalidResponse(msg) => write!(f, "Invalid response: {msg}"),
+            Self::NotFound(msg) => write!(f, "Not found: {msg}"),
         }
     }
 }
@@ -43,7 +45,7 @@ impl From<reqwest::Error> for ScraperError {
 #[cfg(feature = "ssr")]
 impl From<sea_orm::DbErr> for ScraperError {
     fn from(e: sea_orm::DbErr) -> Self {
-        Self::Database(e)
+        Self::Database(e.to_string())
     }
 }
 

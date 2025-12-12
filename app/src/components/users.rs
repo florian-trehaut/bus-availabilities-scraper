@@ -1,4 +1,8 @@
 use crate::api::*;
+use crate::components_impl::{
+    build_user_form_dto, extract_user_form_state, notify_mode_badge_class, notify_mode_text,
+    user_status_badge_class, user_status_text,
+};
 use leptos::prelude::*;
 
 #[cfg(target_arch = "wasm32")]
@@ -178,19 +182,17 @@ fn UsersTable(
                                         {user.email.clone()}
                                     </td>
                                     <td class="table-cell">
-                                        <span class={if user.enabled { "badge-success" } else { "badge-danger" }}>
-                                            {if user.enabled { "Active" } else { "Inactive" }}
+                                        <span class={user_status_badge_class(user.enabled)}>
+                                            {user_status_text(user.enabled)}
                                         </span>
                                     </td>
                                     <td class="table-cell">
                                         <span class="badge-neutral">{user.scrape_interval_secs}"s"</span>
                                     </td>
                                     <td class="table-cell">
-                                        {if user.notify_on_change_only {
-                                            view! { <span class="badge-info">"Changes Only"</span> }.into_any()
-                                        } else {
-                                            view! { <span class="badge-neutral">"All"</span> }.into_any()
-                                        }}
+                                        <span class={notify_mode_badge_class(user.notify_on_change_only)}>
+                                            {notify_mode_text(user.notify_on_change_only)}
+                                        </span>
                                     </td>
                                     <td class="table-cell">
                                         <div class="flex items-center justify-end gap-2">
@@ -249,42 +251,25 @@ fn UserForm(
 ) -> impl IntoView {
     let is_edit = move || user.get().is_some();
 
-    let (email, set_email) = signal(
-        user.get()
-            .as_ref()
-            .map(|u| u.email.clone())
-            .unwrap_or_default(),
-    );
-    let (enabled, set_enabled) = signal(user.get().as_ref().is_none_or(|u| u.enabled));
-    let (notify_on_change, set_notify_on_change) =
-        signal(user.get().as_ref().is_none_or(|u| u.notify_on_change_only));
-    let (interval, set_interval) = signal(
-        user.get()
-            .as_ref()
-            .map_or_else(|| "300".to_string(), |u| u.scrape_interval_secs.to_string()),
-    );
-    let (webhook, set_webhook) = signal(
-        user.get()
-            .as_ref()
-            .and_then(|u| u.discord_webhook_url.clone())
-            .unwrap_or_default(),
-    );
+    let initial = extract_user_form_state(user.get().as_ref());
+    let (email, set_email) = signal(initial.email);
+    let (enabled, set_enabled) = signal(initial.enabled);
+    let (notify_on_change, set_notify_on_change) = signal(initial.notify_on_change_only);
+    let (interval, set_interval) = signal(initial.interval);
+    let (webhook, set_webhook) = signal(initial.webhook);
     let (is_saving, set_is_saving) = signal(false);
 
     let handle_submit = move |ev: leptos::ev::SubmitEvent| {
         ev.prevent_default();
         set_is_saving.set(true);
 
-        let form_data = UserFormDto {
-            email: email.get(),
-            enabled: enabled.get(),
-            notify_on_change_only: notify_on_change.get(),
-            scrape_interval_secs: interval.get().parse().unwrap_or(300),
-            discord_webhook_url: {
-                let w = webhook.get();
-                if w.is_empty() { None } else { Some(w) }
-            },
-        };
+        let form_data = build_user_form_dto(
+            email.get(),
+            enabled.get(),
+            notify_on_change.get(),
+            interval.get(),
+            webhook.get(),
+        );
 
         let user_id = user.get().as_ref().map(|u| u.id.clone());
         let is_edit = user_id.is_some();

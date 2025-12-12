@@ -359,3 +359,208 @@ async fn test_scraper_with_different_base_urls() {
     assert_eq!(routes1[0].id, "111");
     assert_eq!(routes2[0].id, "222");
 }
+
+// === check_availability_full TESTS ===
+
+#[tokio::test]
+async fn test_check_availability_full_multiple_dates() {
+    let mock_server = MockServer::start().await;
+
+    // Mock that returns different schedules - will be called for each date
+    let schedules_html = r#"<!DOCTYPE html>
+<html><body>
+    <section class="busSvclistItem">
+        <ul>
+            <li class="dep"><p class="time">9:00 発</p></li>
+            <li class="arr"><p class="time">12:00 着</p></li>
+        </ul>
+        <div class="planArea">
+            <p class="price">3,000円</p>
+            <form name="selectPlan">
+                <input type="hidden" class="seat_0" value="1" data-index="0">
+                <input type="hidden" name="discntPlanNo" value="100">
+                <button>残り3席</button>
+            </form>
+        </div>
+    </section>
+</body></html>"#;
+
+    Mock::given(method("GET"))
+        .and(path("/reservation/rsvPlanList"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(schedules_html))
+        .expect(3) // 3 dates = 3 requests
+        .mount(&mock_server)
+        .await;
+
+    let scraper = BusScraper::new(mock_server.uri()).unwrap();
+
+    // Request spanning 3 days
+    let request = ScrapeRequest {
+        area_id: 100,
+        route_id: 110,
+        departure_station: "001".to_string(),
+        arrival_station: "064".to_string(),
+        date_range: DateRange {
+            start: "2025-01-15".to_string(),
+            end: "2025-01-17".to_string(), // 3 days: 15, 16, 17
+        },
+        passengers: PassengerCount::default(),
+        time_filter: None,
+    };
+
+    let schedules = scraper.check_availability_full(&request).await.unwrap();
+
+    // Should have schedules from all 3 days
+    assert_eq!(schedules.len(), 3);
+}
+
+#[tokio::test]
+async fn test_check_availability_full_with_some_failures() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+
+    let mock_server = MockServer::start().await;
+
+    let call_count = Arc::new(AtomicUsize::new(0));
+    let call_count_clone = call_count.clone();
+
+    // Respond with success for some requests, 500 error for others
+    Mock::given(method("GET"))
+        .and(path("/reservation/rsvPlanList"))
+        .respond_with(move |_: &wiremock::Request| {
+            let count = call_count_clone.fetch_add(1, Ordering::SeqCst);
+            if count == 1 {
+                // Fail on second request
+                ResponseTemplate::new(500)
+            } else {
+                ResponseTemplate::new(200).set_body_string(
+                    r#"<!DOCTYPE html>
+<html><body>
+    <section class="busSvclistItem">
+        <ul>
+            <li class="dep"><p class="time">10:00 発</p></li>
+            <li class="arr"><p class="time">13:00 着</p></li>
+        </ul>
+        <div class="planArea">
+            <p class="price">2,500円</p>
+            <form name="selectPlan">
+                <input type="hidden" class="seat_0" value="1" data-index="0">
+                <input type="hidden" name="discntPlanNo" value="200">
+                <button>残り5席</button>
+            </form>
+        </div>
+    </section>
+</body></html>"#,
+                )
+            }
+        })
+        .expect(3)
+        .mount(&mock_server)
+        .await;
+
+    let scraper = BusScraper::new(mock_server.uri()).unwrap();
+
+    let request = ScrapeRequest {
+        area_id: 100,
+        route_id: 110,
+        departure_station: "001".to_string(),
+        arrival_station: "064".to_string(),
+        date_range: DateRange {
+            start: "2025-01-15".to_string(),
+            end: "2025-01-17".to_string(),
+        },
+        passengers: PassengerCount::default(),
+        time_filter: None,
+    };
+
+    // Should succeed even with one failure - should have 2 schedules (days 1 and 3)
+    let schedules = scraper.check_availability_full(&request).await.unwrap();
+
+    // 2 successful days out of 3
+    assert_eq!(schedules.len(), 2);
+}
+
+#[tokio::test]
+async fn test_check_availability_full_empty_results() {
+    let mock_server = MockServer::start().await;
+
+    // Mock returns empty HTML (no schedules)
+    Mock::given(method("GET"))
+        .and(path("/reservation/rsvPlanList"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string(r#"<!DOCTYPE html><html><body></body></html>"#),
+        )
+        .mount(&mock_server)
+        .await;
+
+    let scraper = BusScraper::new(mock_server.uri()).unwrap();
+
+    let request = ScrapeRequest {
+        area_id: 100,
+        route_id: 110,
+        departure_station: "001".to_string(),
+        arrival_station: "064".to_string(),
+        date_range: DateRange {
+            start: "2025-01-15".to_string(),
+            end: "2025-01-15".to_string(),
+        },
+        passengers: PassengerCount::default(),
+        time_filter: None,
+    };
+
+    let schedules = scraper.check_availability_full(&request).await.unwrap();
+
+    assert!(schedules.is_empty());
+}
+
+#[tokio::test]
+async fn test_check_availability_full_single_date() {
+    let mock_server = MockServer::start().await;
+
+    let schedules_html = r#"<!DOCTYPE html>
+<html><body>
+    <section class="busSvclistItem">
+        <ul>
+            <li class="dep"><p class="time">8:30 発</p></li>
+            <li class="arr"><p class="time">11:30 着</p></li>
+        </ul>
+        <div class="planArea">
+            <p class="price">2,800円</p>
+            <form name="selectPlan">
+                <input type="hidden" class="seat_0" value="1" data-index="0">
+                <input type="hidden" name="discntPlanNo" value="300">
+                <button>残り8席</button>
+            </form>
+        </div>
+    </section>
+</body></html>"#;
+
+    Mock::given(method("GET"))
+        .and(path("/reservation/rsvPlanList"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(schedules_html))
+        .expect(1)
+        .mount(&mock_server)
+        .await;
+
+    let scraper = BusScraper::new(mock_server.uri()).unwrap();
+
+    // Single date (start == end)
+    let request = ScrapeRequest {
+        area_id: 100,
+        route_id: 110,
+        departure_station: "001".to_string(),
+        arrival_station: "064".to_string(),
+        date_range: DateRange {
+            start: "2025-01-20".to_string(),
+            end: "2025-01-20".to_string(),
+        },
+        passengers: PassengerCount::default(),
+        time_filter: None,
+    };
+
+    let schedules = scraper.check_availability_full(&request).await.unwrap();
+
+    assert_eq!(schedules.len(), 1);
+    assert_eq!(schedules[0].departure_time, "8:30");
+}

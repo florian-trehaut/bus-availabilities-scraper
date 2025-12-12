@@ -66,6 +66,10 @@ ssr = [
 wiremock.workspace = true
 temp-env.workspace = true
 serial_test.workspace = true
+leptos_axum.workspace = true
+axum.workspace = true
+tower = { workspace = true, features = ["util"] }
+http-body-util = "0.1"
 
 [lints]
 workspace = true

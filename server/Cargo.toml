@@ -3,6 +3,10 @@ name = "server"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "server_lib"
+path = "src/lib.rs"
+
 [[bin]]
 name = "server"
 path = "src/main.rs"
@@ -40,6 +44,7 @@ tower = { workspace = true, features = ["util"] }
 hyper = { version = "1.0", features = ["full"] }
 http-body-util = "0.1"
 wiremock.workspace = true
+urlencoding = "2.1"
 
 [lints]
 workspace = true

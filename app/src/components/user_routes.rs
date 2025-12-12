@@ -1,4 +1,8 @@
 use crate::api::*;
+use crate::components_impl::{
+    build_user_route_form_dto, calculate_total_passengers, extract_user_route_form_state,
+    PassengerCountData,
+};
 use leptos::prelude::*;
 
 #[cfg(target_arch = "wasm32")]
@@ -265,14 +269,16 @@ fn RouteRow(
 ) -> impl IntoView {
     let route_clone = route.clone();
     let route_id = route.id.clone();
-    let total_passengers = route.adult_men
-        + route.adult_women
-        + route.child_men
-        + route.child_women
-        + route.handicap_adult_men
-        + route.handicap_adult_women
-        + route.handicap_child_men
-        + route.handicap_child_women;
+    let total_passengers = calculate_total_passengers(
+        route.adult_men,
+        route.adult_women,
+        route.child_men,
+        route.child_women,
+        route.handicap_adult_men,
+        route.handicap_adult_women,
+        route.handicap_child_men,
+        route.handicap_child_women,
+    );
 
     view! {
         <tr class="table-row">
@@ -342,59 +348,27 @@ fn UserRouteFormModal(
     on_save: impl Fn() + 'static + Copy,
 ) -> impl IntoView {
     let is_edit = move || route.get().is_some();
-    let initial = route.get();
+    let initial = extract_user_route_form_state(route.get().as_ref());
 
-    let (area_id, set_area_id) = signal(initial.as_ref().map_or(1, |r| r.area_id));
-    let (route_id_val, set_route_id_val) = signal(
-        initial
-            .as_ref()
-            .map_or_else(String::new, |r| r.route_id.clone()),
-    );
-    let (departure_station, set_departure_station) = signal(
-        initial
-            .as_ref()
-            .map_or_else(String::new, |r| r.departure_station.clone()),
-    );
-    let (arrival_station, set_arrival_station) = signal(
-        initial
-            .as_ref()
-            .map_or_else(String::new, |r| r.arrival_station.clone()),
-    );
-    let (date_start, set_date_start) = signal(
-        initial
-            .as_ref()
-            .map_or_else(String::new, |r| r.date_start.clone()),
-    );
-    let (date_end, set_date_end) = signal(
-        initial
-            .as_ref()
-            .map_or_else(String::new, |r| r.date_end.clone()),
-    );
-    let (time_min, set_time_min) = signal(
-        initial
-            .as_ref()
-            .and_then(|r| r.departure_time_min.clone())
-            .unwrap_or_default(),
-    );
-    let (time_max, set_time_max) = signal(
-        initial
-            .as_ref()
-            .and_then(|r| r.departure_time_max.clone())
-            .unwrap_or_default(),
-    );
+    let (area_id, set_area_id) = signal(initial.area_id);
+    let (route_id_val, set_route_id_val) = signal(initial.route_id);
+    let (departure_station, set_departure_station) = signal(initial.departure_station);
+    let (arrival_station, set_arrival_station) = signal(initial.arrival_station);
+    let (date_start, set_date_start) = signal(initial.date_start);
+    let (date_end, set_date_end) = signal(initial.date_end);
+    let (time_min, set_time_min) = signal(initial.time_min);
+    let (time_max, set_time_max) = signal(initial.time_max);
 
-    let (adult_men, set_adult_men) = signal(initial.as_ref().map_or(0i16, |r| r.adult_men));
-    let (adult_women, set_adult_women) = signal(initial.as_ref().map_or(0i16, |r| r.adult_women));
-    let (child_men, set_child_men) = signal(initial.as_ref().map_or(0i16, |r| r.child_men));
-    let (child_women, set_child_women) = signal(initial.as_ref().map_or(0i16, |r| r.child_women));
-    let (handicap_adult_men, set_handicap_adult_men) =
-        signal(initial.as_ref().map_or(0i16, |r| r.handicap_adult_men));
+    let (adult_men, set_adult_men) = signal(initial.passengers.adult_men);
+    let (adult_women, set_adult_women) = signal(initial.passengers.adult_women);
+    let (child_men, set_child_men) = signal(initial.passengers.child_men);
+    let (child_women, set_child_women) = signal(initial.passengers.child_women);
+    let (handicap_adult_men, set_handicap_adult_men) = signal(initial.passengers.handicap_adult_men);
     let (handicap_adult_women, set_handicap_adult_women) =
-        signal(initial.as_ref().map_or(0i16, |r| r.handicap_adult_women));
-    let (handicap_child_men, set_handicap_child_men) =
-        signal(initial.as_ref().map_or(0i16, |r| r.handicap_child_men));
+        signal(initial.passengers.handicap_adult_women);
+    let (handicap_child_men, set_handicap_child_men) = signal(initial.passengers.handicap_child_men);
     let (handicap_child_women, set_handicap_child_women) =
-        signal(initial.as_ref().map_or(0i16, |r| r.handicap_child_women));
+        signal(initial.passengers.handicap_child_women);
 
     let (is_saving, set_is_saving) = signal(false);
 
@@ -403,22 +377,7 @@ fn UserRouteFormModal(
         ev.prevent_default();
         set_is_saving.set(true);
 
-        let form_data = UserRouteFormDto {
-            user_id: user_id_clone.clone(),
-            area_id: area_id.get(),
-            route_id: route_id_val.get(),
-            departure_station: departure_station.get(),
-            arrival_station: arrival_station.get(),
-            date_start: date_start.get(),
-            date_end: date_end.get(),
-            departure_time_min: {
-                let t = time_min.get();
-                if t.is_empty() { None } else { Some(t) }
-            },
-            departure_time_max: {
-                let t = time_max.get();
-                if t.is_empty() { None } else { Some(t) }
-            },
+        let passengers = PassengerCountData {
             adult_men: adult_men.get(),
             adult_women: adult_women.get(),
             child_men: child_men.get(),
@@ -428,6 +387,19 @@ fn UserRouteFormModal(
             handicap_child_men: handicap_child_men.get(),
             handicap_child_women: handicap_child_women.get(),
         };
+
+        let form_data = build_user_route_form_dto(
+            user_id_clone.clone(),
+            area_id.get(),
+            route_id_val.get(),
+            departure_station.get(),
+            arrival_station.get(),
+            date_start.get(),
+            date_end.get(),
+            time_min.get(),
+            time_max.get(),
+            passengers,
+        );
 
         let route_uuid = route.get().as_ref().map(|r| r.id.clone());
         let is_edit_mode = route_uuid.is_some();
