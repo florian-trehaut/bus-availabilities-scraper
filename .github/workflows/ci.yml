@@ -103,6 +103,9 @@ jobs:
       - name: Build Leptos app
         run: cargo leptos build --release
 
+      - name: Create data directory
+        run: mkdir -p data
+
       - name: Run E2E tests
         run: npm run test:e2e
         env:

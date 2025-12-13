@@ -85,3 +85,10 @@ npm run test:e2e
 - **DRY**: Extract repeated logic, single source of truth
 - **YAGNI**: No speculative features, build only what's required now
 - **KISS**: Simplest solution, flat over nested
+
+## CI/Testing Rules
+
+- **NEVER bypass or exclude crates/tests** to make CI pass
+- Fix the root cause, not the symptom
+- If a crate doesn't compile in a certain context, fix the crate's configuration
+- `--exclude` flags in CI are strictly forbidden unless explicitly approved
