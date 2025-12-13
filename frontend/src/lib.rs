@@ -1,3 +1,5 @@
+#![recursion_limit = "256"]
+
 use app::components::App;
 use leptos::mount::hydrate_body;
 use wasm_bindgen::prelude::wasm_bindgen;
