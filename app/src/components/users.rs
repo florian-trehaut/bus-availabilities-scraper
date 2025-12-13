@@ -267,7 +267,7 @@ fn UserForm(
             email.get(),
             enabled.get(),
             notify_on_change.get(),
-            interval.get(),
+            &interval.get(),
             webhook.get(),
         );
 

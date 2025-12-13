@@ -1,6 +1,13 @@
 //! Integration tests for notifier.rs using wiremock
 //!
 //! Tests Discord webhook notifications with mocked HTTP server
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::doc_markdown,
+    clippy::uninlined_format_args
+)]
 
 use app::notifier::{DiscordNotifier, NotificationContext};
 use app::types::{BusSchedule, PricingPlan, SeatAvailability};

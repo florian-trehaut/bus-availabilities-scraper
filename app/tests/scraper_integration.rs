@@ -1,6 +1,14 @@
 //! Integration tests for scraper.rs using wiremock
 //!
 //! Tests HTTP interactions with mocked external API
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::needless_raw_string_hashes,
+    clippy::doc_markdown,
+    clippy::uninlined_format_args
+)]
 
 use app::scraper::BusScraper;
 use app::types::{DateRange, PassengerCount, ScrapeRequest, TimeFilter};
@@ -416,8 +424,8 @@ async fn test_check_availability_full_multiple_dates() {
 
 #[tokio::test]
 async fn test_check_availability_full_with_some_failures() {
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     let mock_server = MockServer::start().await;
 

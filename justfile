@@ -46,6 +46,22 @@ docker-down:
 # === Release ===
 release: check test build
 
+# === Hooks ===
+hooks-install:
+    lefthook install
+    # Patch hooks to run on entire repo, not just staged files
+    sed -i '' 's/run "pre-commit" "\$@"/run "pre-commit" --force "\$@"/' .git/hooks/pre-commit
+    sed -i '' 's/run "pre-push" "\$@"/run "pre-push" --force "\$@"/' .git/hooks/pre-push
+
+hooks-uninstall:
+    lefthook uninstall
+
+pre-commit:
+    lefthook run pre-commit --force
+
+pre-push:
+    lefthook run pre-push --force
+
 # === Claude Flow ===
 cf-init:
     npx claude-flow@alpha init --force --project-name bus-scraper

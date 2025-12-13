@@ -4,7 +4,13 @@
 //! for all routes without panicking.
 
 #![recursion_limit = "512"]
-#![allow(clippy::unwrap_used)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::doc_markdown,
+    clippy::uninlined_format_args
+)]
 
 use app::{components::App, db};
 use axum::{Router, body::Body, http::Request, routing::get};

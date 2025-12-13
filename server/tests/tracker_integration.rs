@@ -2,10 +2,19 @@
 //!
 //! These tests verify:
 //! - Station cache population from API
-//! - ScrapeRequest building from UserRouteWithDetails
-//! - NotificationContext building with station name resolution
+//! - `ScrapeRequest` building from `UserRouteWithDetails`
+//! - `NotificationContext` building with station name resolution
 //! - Tracker initialization with/without routes
 //! - State hash edge cases
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::doc_markdown,
+    clippy::uninlined_format_args,
+    clippy::too_many_arguments,
+    clippy::useless_vec
+)]
 
 use app::{
     db,

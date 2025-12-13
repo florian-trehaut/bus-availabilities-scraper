@@ -2,6 +2,15 @@
 //!
 //! These tests create a full Axum router with Leptos context
 //! and test the server functions through HTTP requests.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::doc_markdown,
+    clippy::uninlined_format_args,
+    clippy::too_many_arguments,
+    clippy::unused_async
+)]
 
 use app::{db, scraper::BusScraper};
 use axum::{

@@ -1,11 +1,20 @@
 //! Comprehensive E2E tests for all Leptos server functions
 //!
 //! These tests provide complete coverage of API endpoints including:
-//! - Full CRUD workflows for users and user_routes
+//! - Full CRUD workflows for users and `user_routes`
 //! - Different area IDs for routes
 //! - Station fetching (departure and arrival)
 //! - Error handling for nonexistent resources
-//! - Content-Type handling
+//! - `Content-Type` handling
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::doc_markdown,
+    clippy::uninlined_format_args,
+    clippy::too_many_arguments,
+    clippy::unused_async
+)]
 
 use app::{db, scraper::BusScraper};
 use axum::{Router, body::Body, http::Request, routing::get};

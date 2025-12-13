@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Routes Page', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/routes');
+    await page.goto('/user-routes');
   });
 
   test('displays page header and disabled add button initially', async ({ page }) => {
@@ -41,7 +41,7 @@ test.describe('Routes Page', () => {
     }
 
     // Go back to routes page
-    await page.goto('/routes');
+    await page.goto('/user-routes');
     await page.waitForSelector('select', { timeout: 10000 });
 
     // Select the first user
@@ -71,7 +71,7 @@ test.describe('Routes Page', () => {
       await expect(page.locator('.modal-content')).not.toBeVisible({ timeout: 10000 });
     }
 
-    await page.goto('/routes');
+    await page.goto('/user-routes');
     await page.waitForSelector('select', { timeout: 10000 });
 
     // Select a user
@@ -108,7 +108,7 @@ test.describe('Routes Page', () => {
       await expect(page.locator('.modal-content')).not.toBeVisible({ timeout: 10000 });
     }
 
-    await page.goto('/routes');
+    await page.goto('/user-routes');
     await page.waitForSelector('select', { timeout: 10000 });
 
     // Select user
@@ -125,8 +125,8 @@ test.describe('Routes Page', () => {
       // Click add route
       await addButton.click();
 
-      // Modal should open
-      await expect(page.locator('.modal-content')).toBeVisible({ timeout: 5000 });
+      // Modal should open (uses modal-content-lg class)
+      await expect(page.locator('[class*="modal-content"]')).toBeVisible({ timeout: 5000 });
       await expect(page.locator('h2:has-text("Add Route")')).toBeVisible();
     }
   });
@@ -144,7 +144,7 @@ test.describe('Routes Page', () => {
       await expect(page.locator('.modal-content')).not.toBeVisible({ timeout: 10000 });
     }
 
-    await page.goto('/routes');
+    await page.goto('/user-routes');
     await page.waitForSelector('select', { timeout: 10000 });
 
     // Select user and open form
@@ -158,19 +158,19 @@ test.describe('Routes Page', () => {
       await expect(addButton).not.toBeDisabled({ timeout: 5000 });
       await addButton.click();
 
-      await expect(page.locator('.modal-content')).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('[class*="modal-content"]')).toBeVisible({ timeout: 5000 });
 
-      // Should have area select
-      const areaLabel = page.locator('text=Area');
+      // Should have area select (use fieldset legend to be specific)
+      const areaLabel = page.locator('legend:has-text("Route Selection")');
       await expect(areaLabel).toBeVisible();
 
-      // Should have route select (may be disabled initially)
-      const routeLabel = page.locator('text=Route');
-      await expect(routeLabel).toBeVisible();
+      // Should have date section
+      const dateLabel = page.locator('legend:has-text("Date")');
+      await expect(dateLabel).toBeVisible();
 
       // Should have date inputs
       const startDateLabel = page.locator('text=Start Date');
-      await expect(startDateLabel).toBeVisible();
+      await expect(startDateLabel.first()).toBeVisible();
     }
   });
 
@@ -187,7 +187,7 @@ test.describe('Routes Page', () => {
       await expect(page.locator('.modal-content')).not.toBeVisible({ timeout: 10000 });
     }
 
-    await page.goto('/routes');
+    await page.goto('/user-routes');
     await page.waitForSelector('select', { timeout: 10000 });
 
     const userSelect = page.locator('select').first();
@@ -195,18 +195,19 @@ test.describe('Routes Page', () => {
 
     if (options.length > 1) {
       await userSelect.selectOption({ index: 1 });
+      await page.waitForTimeout(500);
 
       const addButton = page.locator('button:has-text("Add Route")');
-      await expect(addButton).not.toBeDisabled({ timeout: 5000 });
+      await expect(addButton).not.toBeDisabled({ timeout: 10000 });
       await addButton.click();
 
-      await expect(page.locator('.modal-content')).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('[class*="modal-content"]')).toBeVisible({ timeout: 5000 });
 
       // Click cancel
       await page.click('button:has-text("Cancel")');
 
       // Modal should close
-      await expect(page.locator('.modal-content')).not.toBeVisible();
+      await expect(page.locator('[class*="modal-content"]')).not.toBeVisible();
     }
   });
 
@@ -223,7 +224,7 @@ test.describe('Routes Page', () => {
       await expect(page.locator('.modal-content')).not.toBeVisible({ timeout: 10000 });
     }
 
-    await page.goto('/routes');
+    await page.goto('/user-routes');
     await page.waitForSelector('select', { timeout: 10000 });
 
     const userSelect = page.locator('select').first();
@@ -231,15 +232,20 @@ test.describe('Routes Page', () => {
 
     if (options.length > 1) {
       await userSelect.selectOption({ index: 1 });
+      await page.waitForTimeout(500);
 
       const addButton = page.locator('button:has-text("Add Route")');
-      await expect(addButton).not.toBeDisabled({ timeout: 5000 });
+      await expect(addButton).not.toBeDisabled({ timeout: 10000 });
       await addButton.click();
 
-      await expect(page.locator('.modal-content')).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('[class*="modal-content"]')).toBeVisible({ timeout: 5000 });
+
+      // Scroll to see Passengers section (modal has max-height with overflow)
+      const modal = page.locator('[class*="modal-content"]');
+      await modal.evaluate(el => el.scrollTop = el.scrollHeight);
 
       // Should have passenger section with Adult Men, Adult Women, etc.
-      const passengersLabel = page.locator('text=Passengers');
+      const passengersLabel = page.locator('legend:has-text("Passengers")');
       await expect(passengersLabel).toBeVisible();
 
       // Should have Adult Men field

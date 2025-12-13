@@ -1,3 +1,14 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::uninlined_format_args,
+    clippy::useless_vec,
+    clippy::redundant_closure,
+    clippy::redundant_closure_for_method_calls,
+    clippy::unnecessary_wraps
+)]
+
 use app::error::ScraperError;
 
 // Test Display implementation for Parse variant

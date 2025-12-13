@@ -1,3 +1,7 @@
+// Config module uses std::env::var for loading environment variables.
+// All usages handle errors properly with unwrap_or_else or map_err.
+#![allow(clippy::disallowed_methods)]
+
 use crate::error::{Result, ScraperError};
 use crate::types::{DateRange, PassengerCount, ScrapeRequest, TimeFilter};
 use chrono::Local;

@@ -2,6 +2,9 @@
 .env
 .env.local
 
+# Coverage
+coverage/
+
 # Data files
 /data/
 

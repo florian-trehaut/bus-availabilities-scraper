@@ -351,14 +351,15 @@ pub async fn fetch_and_translate_arrival_stations(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::panic)]
     use super::*;
 
     #[test]
     fn test_parse_uuid_valid() {
         let uuid_str = "550e8400-e29b-41d4-a716-446655440000";
         let result = parse_uuid(uuid_str);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap().to_string(), uuid_str);
+        let parsed_uuid = result.unwrap_or_else(|e| panic!("valid UUID should parse: {e}"));
+        assert_eq!(parsed_uuid.to_string(), uuid_str);
     }
 
     #[test]

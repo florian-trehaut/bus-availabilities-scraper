@@ -10,6 +10,7 @@ use crate::api::{UserDto, UserFormDto, UserRouteFormDto, UserRouteWithPassengers
 // === Passenger Calculations ===
 
 /// Calculate the total number of passengers from individual counts.
+#[allow(clippy::too_many_arguments)]
 pub fn calculate_total_passengers(
     adult_men: i16,
     adult_women: i16,
@@ -35,15 +36,11 @@ pub fn calculate_total_passengers(
 /// Convert an empty string to None, otherwise Some(string).
 /// Used for optional form fields like webhook URLs and time filters.
 pub fn optional_string(s: String) -> Option<String> {
-    if s.is_empty() {
-        None
-    } else {
-        Some(s)
-    }
+    if s.is_empty() { None } else { Some(s) }
 }
 
 /// Parse an interval string to u64, with a default fallback.
-/// Used for scrape_interval_secs parsing.
+/// Used for `scrape_interval_secs` parsing.
 pub fn parse_interval(s: &str, default: i64) -> i64 {
     s.parse().unwrap_or(default)
 }
@@ -61,11 +58,7 @@ pub fn user_status_badge_class(enabled: bool) -> &'static str {
 
 /// Get the display text for user enabled status.
 pub fn user_status_text(enabled: bool) -> &'static str {
-    if enabled {
-        "Active"
-    } else {
-        "Inactive"
-    }
+    if enabled { "Active" } else { "Inactive" }
 }
 
 /// Get the display text for notify mode.
@@ -95,25 +88,25 @@ pub fn is_edit_mode<T>(item: &Option<T>) -> bool {
 
 // === Form Data Builders ===
 
-/// Build a UserFormDto from form field values.
+/// Build a [`UserFormDto`] from form field values.
 pub fn build_user_form_dto(
     email: String,
     enabled: bool,
     notify_on_change_only: bool,
-    interval_str: String,
+    interval_str: &str,
     webhook: String,
 ) -> UserFormDto {
     UserFormDto {
         email,
         enabled,
         notify_on_change_only,
-        scrape_interval_secs: parse_interval(&interval_str, 300),
+        scrape_interval_secs: parse_interval(interval_str, 300),
         discord_webhook_url: optional_string(webhook),
     }
 }
 
 /// Passenger count data structure for form building.
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct PassengerCountData {
     pub adult_men: i16,
     pub adult_women: i16,
@@ -141,7 +134,8 @@ impl PassengerCountData {
     }
 }
 
-/// Build a UserRouteFormDto from form field values.
+/// Build a [`UserRouteFormDto`] from form field values.
+#[allow(clippy::too_many_arguments)]
 pub fn build_user_route_form_dto(
     user_id: String,
     area_id: i32,
@@ -203,7 +197,7 @@ pub struct UserFormState {
     pub webhook: String,
 }
 
-/// Extract the initial form state from an optional UserDto.
+/// Extract the initial form state from an optional [`UserDto`].
 /// Returns defaults for new user creation, or populated values for editing.
 pub fn extract_user_form_state(user: Option<&UserDto>) -> UserFormState {
     match user {
@@ -224,7 +218,7 @@ pub fn extract_user_form_state(user: Option<&UserDto>) -> UserFormState {
     }
 }
 
-/// Initial state for a UserRoute form (create or edit).
+/// Initial state for a [`UserRoute`] form (create or edit).
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct UserRouteFormState {
     pub area_id: i32,
@@ -238,9 +232,11 @@ pub struct UserRouteFormState {
     pub passengers: PassengerCountData,
 }
 
-/// Extract the initial form state from an optional UserRouteWithPassengersDto.
+/// Extract the initial form state from an optional [`UserRouteWithPassengersDto`].
 /// Returns defaults for new route creation, or populated values for editing.
-pub fn extract_user_route_form_state(route: Option<&UserRouteWithPassengersDto>) -> UserRouteFormState {
+pub fn extract_user_route_form_state(
+    route: Option<&UserRouteWithPassengersDto>,
+) -> UserRouteFormState {
     match route {
         Some(r) => UserRouteFormState {
             area_id: r.area_id,
@@ -417,7 +413,7 @@ mod tests {
             "test@example.com".to_string(),
             true,
             false,
-            "600".to_string(),
+            "600",
             "https://webhook.url".to_string(),
         );
 
@@ -425,7 +421,10 @@ mod tests {
         assert!(dto.enabled);
         assert!(!dto.notify_on_change_only);
         assert_eq!(dto.scrape_interval_secs, 600);
-        assert_eq!(dto.discord_webhook_url, Some("https://webhook.url".to_string()));
+        assert_eq!(
+            dto.discord_webhook_url,
+            Some("https://webhook.url".to_string())
+        );
     }
 
     #[test]
@@ -434,7 +433,7 @@ mod tests {
             "test@example.com".to_string(),
             true,
             true,
-            "300".to_string(),
+            "300",
             String::new(),
         );
 

@@ -1,6 +1,13 @@
 //! Integration tests for API database operations
 //! These tests cover the same logic as the Leptos server functions but
 //! bypass the Leptos context by directly using the database operations.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::doc_markdown,
+    clippy::uninlined_format_args
+)]
 
 use app::db::init_database;
 use app::entities::{prelude::*, user_passengers, user_routes, users};

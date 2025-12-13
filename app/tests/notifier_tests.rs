@@ -3,8 +3,16 @@
 //! Covers:
 //! - Network errors (lines 62-64, 97-99)
 //! - HTTP error responses (lines 56-57)
-//! - Empty available_plans (line 114)
-//! - SeatAvailability::Available with None seats (line 125)
+//! - Empty `available_plans` (line 114)
+//! - `SeatAvailability::Available` with None seats (line 125)
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::doc_markdown,
+    clippy::uninlined_format_args,
+    clippy::cloned_ref_to_slice_refs
+)]
 
 use app::notifier::{DiscordNotifier, NotificationContext};
 use app::types::{BusSchedule, PricingPlan, SeatAvailability};

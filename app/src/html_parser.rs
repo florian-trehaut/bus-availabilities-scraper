@@ -377,7 +377,7 @@ mod tests {
 
     #[test]
     fn test_parse_schedules_html_no_buses() {
-        let html = r#"<html><body><div>No buses available</div></body></html>"#;
+        let html = r"<html><body><div>No buses available</div></body></html>";
 
         let schedules = parse_schedules_html(html, "20251029").unwrap();
         assert!(schedules.is_empty());

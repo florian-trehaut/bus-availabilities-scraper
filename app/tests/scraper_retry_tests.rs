@@ -1,19 +1,29 @@
 //! Retry logic tests for scraper.rs
 //!
-//! Tests verify the fetch_with_retry mechanism and documents current behavior:
-//! - HTTP 503 responses become InvalidResponse (no retry)
-//! - Only reqwest-level errors with 503 status trigger ServiceUnavailable retry
+//! Tests verify the `fetch_with_retry` mechanism and documents current behavior:
+//! - HTTP 503 responses become `InvalidResponse` (no retry)
+//! - Only reqwest-level errors with 503 status trigger `ServiceUnavailable` retry
 //! - Non-503 errors don't retry
 //!
 //! IMPORTANT: The retry logic (lines 192-200) exists but is only triggered by
-//! ServiceUnavailable errors. However, fetch_data converts HTTP 503 responses
-//! to InvalidResponse (line 217-222), not ServiceUnavailable. ServiceUnavailable
+//! `ServiceUnavailable` errors. However, `fetch_data` converts HTTP 503 responses
+//! to `InvalidResponse` (line 217-222), not `ServiceUnavailable`. `ServiceUnavailable`
 //! is only returned when reqwest itself encounters 503 during connection handling,
 //! which is extremely rare in practice.
 //!
 //! These tests document this behavior and verify that:
 //! 1. HTTP error responses (400, 404, 500, 503) don't retry
-//! 2. The retry logic itself is correct (if ServiceUnavailable could be triggered)
+//! 2. The retry logic itself is correct (if `ServiceUnavailable` could be triggered)
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::uninlined_format_args,
+    clippy::redundant_closure,
+    clippy::unused_async,
+    clippy::doc_markdown,
+    clippy::assertions_on_constants
+)]
 
 use app::scraper::BusScraper;
 use std::sync::Arc;

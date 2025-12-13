@@ -4,6 +4,14 @@
 //! - State hash calculation
 //! - Route state updates
 //! - Notification triggering logic
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::doc_markdown,
+    clippy::uninlined_format_args,
+    clippy::useless_vec
+)]
 
 use app::{
     db,

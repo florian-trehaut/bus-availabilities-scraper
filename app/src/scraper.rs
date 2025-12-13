@@ -382,7 +382,7 @@ mod tests {
 
     #[test]
     fn test_parse_routes_single_route() {
-        let xml = r#"<id>123</id><name>Test Route</name>"#;
+        let xml = r"<id>123</id><name>Test Route</name>";
 
         let routes = parse_routes(xml).unwrap();
         assert_eq!(routes.len(), 1);
@@ -392,7 +392,7 @@ mod tests {
 
     #[test]
     fn test_parse_routes_with_unicode() {
-        let xml = r#"<id>123</id><name>日本語ルート名 テスト</name>"#;
+        let xml = r"<id>123</id><name>日本語ルート名 テスト</name>";
 
         let routes = parse_routes(xml).unwrap();
         assert_eq!(routes.len(), 1);
@@ -436,7 +436,7 @@ mod tests {
 
     #[test]
     fn test_parse_stations_single_station() {
-        let xml = r#"<id>001</id><name>Test Station</name>"#;
+        let xml = r"<id>001</id><name>Test Station</name>";
 
         let stations = parse_stations(xml).unwrap();
         assert_eq!(stations.len(), 1);
@@ -446,7 +446,7 @@ mod tests {
 
     #[test]
     fn test_parse_stations_with_unicode() {
-        let xml = r#"<id>001</id><name>東京駅 八重洲口</name>"#;
+        let xml = r"<id>001</id><name>東京駅 八重洲口</name>";
 
         let stations = parse_stations(xml).unwrap();
         assert_eq!(stations.len(), 1);

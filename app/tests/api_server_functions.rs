@@ -7,7 +7,16 @@
 //! Test approach:
 //! 1. Set up in-memory SQLite database with migrations
 //! 2. Create Axum router with Leptos server function handlers
-//! 3. Mock BusScraper HTTP calls with wiremock::MockServer
+//! 3. Mock `BusScraper` HTTP calls with `wiremock::MockServer`
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::needless_raw_string_hashes,
+    clippy::doc_markdown,
+    clippy::uninlined_format_args,
+    clippy::unused_async
+)]
 //! 4. Send HTTP requests to `/api/{function_name}` endpoints
 //! 5. Verify responses and database state
 

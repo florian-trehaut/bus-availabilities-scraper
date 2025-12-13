@@ -1,7 +1,14 @@
-//! Integration tests for api_impl module.
+//! Integration tests for `api_impl` module.
 //!
 //! Tests the extracted business logic from server functions using
 //! real SQLite in-memory databases (no mocking internal logic).
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::doc_markdown,
+    clippy::uninlined_format_args
+)]
 
 use app::api::{UserFormDto, UserRouteFormDto};
 use app::api_impl::{
@@ -92,7 +99,10 @@ fn test_user_to_dto_converts_all_fields() {
     assert!(dto.enabled);
     assert!(!dto.notify_on_change_only);
     assert_eq!(dto.scrape_interval_secs, 600);
-    assert_eq!(dto.discord_webhook_url, Some("https://discord.webhook".to_string()));
+    assert_eq!(
+        dto.discord_webhook_url,
+        Some("https://discord.webhook".to_string())
+    );
 }
 
 #[test]
@@ -230,7 +240,10 @@ async fn test_create_user_impl_success() {
     assert!(user.enabled);
     assert!(!user.notify_on_change_only);
     assert_eq!(user.scrape_interval_secs, 600);
-    assert_eq!(user.discord_webhook_url, Some("https://webhook.url".to_string()));
+    assert_eq!(
+        user.discord_webhook_url,
+        Some("https://webhook.url".to_string())
+    );
 }
 
 #[tokio::test]
@@ -466,7 +479,9 @@ async fn test_update_user_route_impl_success() {
         handicap_child_women: 0,
     };
 
-    let updated = update_user_route_impl(&db, route_uuid, update_form).await.unwrap();
+    let updated = update_user_route_impl(&db, route_uuid, update_form)
+        .await
+        .unwrap();
 
     assert_eq!(updated.area_id, 200);
     assert_eq!(updated.route_id, "200");

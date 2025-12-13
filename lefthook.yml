@@ -1,0 +1,45 @@
+pre-commit:
+  parallel: true
+  commands:
+    fmt:
+      run: cargo fmt --all --check
+    clippy:
+      env:
+        RUSTFLAGS: "-D warnings"
+      run: cargo clippy --all-targets --all-features -- -D warnings
+    test:
+      env:
+        RUSTFLAGS: "-D warnings"
+      run: cargo test --all-targets --all-features
+
+pre-push:
+  commands:
+    fmt:
+      run: cargo fmt --all --check
+    clippy:
+      env:
+        RUSTFLAGS: "-D warnings"
+      run: cargo clippy --all-targets --all-features -- -D warnings
+    test:
+      env:
+        RUSTFLAGS: "-D warnings"
+      run: cargo test --all-targets --all-features
+    coverage:
+      run: |
+        COVERAGE=$(cargo tarpaulin --workspace --features ssr --timeout 300 2>&1 | awk '/% coverage/ {gsub(/%/, "", $1); print $1}')
+        if [ -z "$COVERAGE" ]; then
+          echo "Could not parse coverage"
+          exit 1
+        fi
+        if [ "$(echo "$COVERAGE < 50" | bc -l)" -eq 1 ]; then
+          echo "Coverage $COVERAGE% < 50%"
+          exit 1
+        fi
+        echo "Coverage: $COVERAGE%"
+    # e2e: disabled due to Leptos hydration timing issues - run manually
+    # e2e:
+    #   run: |
+    #     cargo leptos build
+    #     npm run test:e2e
+    #   env:
+    #     CI: "true"

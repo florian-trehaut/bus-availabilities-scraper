@@ -1,7 +1,7 @@
 use crate::api::*;
 use crate::components_impl::{
-    build_user_route_form_dto, calculate_total_passengers, extract_user_route_form_state,
-    PassengerCountData,
+    PassengerCountData, build_user_route_form_dto, calculate_total_passengers,
+    extract_user_route_form_state,
 };
 use leptos::prelude::*;
 
@@ -363,10 +363,12 @@ fn UserRouteFormModal(
     let (adult_women, set_adult_women) = signal(initial.passengers.adult_women);
     let (child_men, set_child_men) = signal(initial.passengers.child_men);
     let (child_women, set_child_women) = signal(initial.passengers.child_women);
-    let (handicap_adult_men, set_handicap_adult_men) = signal(initial.passengers.handicap_adult_men);
+    let (handicap_adult_men, set_handicap_adult_men) =
+        signal(initial.passengers.handicap_adult_men);
     let (handicap_adult_women, set_handicap_adult_women) =
         signal(initial.passengers.handicap_adult_women);
-    let (handicap_child_men, set_handicap_child_men) = signal(initial.passengers.handicap_child_men);
+    let (handicap_child_men, set_handicap_child_men) =
+        signal(initial.passengers.handicap_child_men);
     let (handicap_child_women, set_handicap_child_women) =
         signal(initial.passengers.handicap_child_women);
 

@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui",
-    "test:e2e:debug": "playwright test --debug"
+    "test:e2e": "playwright test --config=tests/e2e/playwright/playwright.config.ts",
+    "test:e2e:ui": "playwright test --config=tests/e2e/playwright/playwright.config.ts --ui",
+    "test:e2e:debug": "playwright test --config=tests/e2e/playwright/playwright.config.ts --debug"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0"

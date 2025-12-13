@@ -1,6 +1,13 @@
 //! Integration tests for seed.rs
 //!
 //! Tests database seeding functionality with SQLite in-memory
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::doc_markdown,
+    clippy::uninlined_format_args
+)]
 
 use app::db::init_database;
 use app::entities::{prelude::*, users};
